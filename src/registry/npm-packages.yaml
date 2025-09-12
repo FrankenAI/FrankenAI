@@ -1,0 +1,82 @@
+# NPM package registry for template mapping
+# Maps package names from package.json to template paths
+
+react:
+  common: frameworks/react/react.md
+  versions:
+    16: frameworks/react/react16.md
+    17: frameworks/react/react17.md
+    18: frameworks/react/react18.md
+  category: framework
+
+vue:
+  common: frameworks/vue/vue.md
+  versions:
+    2: frameworks/vue/vue2.md
+    3: frameworks/vue/vue3.md
+  category: framework
+
+vue-router:
+  common: frameworks/vue/packages/vue-router/vue-router.md
+  versions:
+    4: frameworks/vue/packages/vue-router/vue-router4.md
+  category: package
+  ecosystem: vue
+
+"@vue/cli":
+  common: frameworks/vue/packages/vue-cli/vue-cli.md
+  category: package
+  ecosystem: vue
+
+next:
+  common: frameworks/react/packages/nextjs/nextjs.md
+  versions:
+    13: frameworks/react/packages/nextjs/nextjs13.md
+    14: frameworks/react/packages/nextjs/nextjs14.md
+  category: framework
+  ecosystem: react
+
+nuxt:
+  common: frameworks/vue/packages/nuxt/nuxt.md
+  versions:
+    3: frameworks/vue/packages/nuxt/nuxt3.md
+  category: framework
+  ecosystem: vue
+
+svelte:
+  common: frameworks/svelte/svelte.md
+  versions:
+    4: frameworks/svelte/svelte4.md
+    5: frameworks/svelte/svelte5.md
+  category: framework
+
+express:
+  common: systems/expressjs/expressjs.md
+  category: system
+
+fastify:
+  common: systems/fastify/fastify.md
+  category: system
+
+hono:
+  common: systems/hono/hono.md
+  category: system
+
+tailwindcss:
+  common: styling/tailwindcss/tailwind.md
+  versions:
+    3: styling/tailwindcss/tailwind3.md
+  category: styling
+
+bootstrap:
+  common: styling/bootstrap/bootstrap.md
+  versions:
+    5: styling/bootstrap/bootstrap5.md
+  category: styling
+
+typescript:
+  common: languages/typescript/typescript.md
+  versions:
+    4: languages/typescript/typescript4.md
+    5: languages/typescript/typescript5.md
+  category: language

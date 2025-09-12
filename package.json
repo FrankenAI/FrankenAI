@@ -1,0 +1,66 @@
+{
+  "name": "franken-ai",
+  "version": "0.1.0",
+  "description": "Multi-headed AI development assistant combining Claude Code + Gemini CLI",
+  "main": "dist/cli.js",
+  "type": "module",
+  "bin": {
+    "franken-ai": "bin/franken-ai"
+  },
+  "scripts": {
+    "dev": "bun run src/cli.ts",
+    "build": "bun run tsc",
+    "test": "bun test",
+    "start": "node dist/cli.js",
+    "lint": "bun run eslint src/**/*.ts",
+    "lint:fix": "bun run eslint src/**/*.ts --fix",
+    "format": "bun run prettier --write src/**/*.ts",
+    "typecheck": "bun run tsc --noEmit",
+    "prepare": "bun run build",
+    "prepack": "bun run lint && bun run typecheck && bun run build",
+    "install:deps": "bun install"
+  },
+  "keywords": [
+    "ai",
+    "claude",
+    "gemini",
+    "development",
+    "cli",
+    "workspace"
+  ],
+  "author": "Québec Studio",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
+    "fs-extra": "^11.1.1",
+    "inquirer": "^9.2.12",
+    "js-yaml": "^4.1.0",
+    "ora": "^7.0.1",
+    "which": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/inquirer": "^9.0.7",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.8.0",
+    "@types/which": "^3.0.3",
+    "@typescript-eslint/eslint-plugin": "^6.7.4",
+    "@typescript-eslint/parser": "^6.7.4",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-import": "^2.28.1",
+    "eslint-plugin-node": "^11.1.0",
+    "prettier": "^3.0.3",
+    "tsx": "^4.0.0",
+    "typescript": "^5.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "templates"
+  ]
+}
