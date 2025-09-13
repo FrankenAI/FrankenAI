@@ -1,0 +1,21 @@
+{
+  "name": "test-nuxt-project",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "start": "nuxt start",
+    "test": "vitest",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "nuxt": "^3.8.0",
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@nuxt/devtools": "^1.0.0",
+    "vitest": "^1.0.0",
+    "eslint": "^8.0.0"
+  }
+}

@@ -5,8 +5,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { EnvironmentChecker } from '../core/EnvironmentChecker.js';
 import { StackDetector } from '../core/StackDetector.js';
-import { WorkspaceGenerator } from '../core/WorkspaceGenerator.js';
-import { TemplateManager, GuidelineTemplate } from '../core/TemplateManager.js';
+import { GuidelineManager, type GuidelineContext } from '../core/GuidelineManager.js';
 
 export interface InitOptions {
   docs?: boolean;
@@ -58,11 +57,11 @@ export class InitCommand {
     // Step 4: Stack Detection  
     const stack = await this.detectStack();
 
-    // Step 5: Template Selection
-    const selectedTemplates = await this.selectTemplates(stack, toolStatus, options);
+    // Step 5: Template Selection (now automatic based on stack)
+    await this.selectTemplates(stack, toolStatus, options);
 
     // Step 6: Generate Enhanced CLAUDE.md (our main value)
-    await this.generateWorkspace(stack, options, toolStatus, selectedTemplates);
+    await this.generateWorkspace(stack, options, toolStatus, null);
 
     this.log(LogLevel.NORMAL, chalk.green.bold('\n✅ FrankenAI setup complete!'));
     this.log(LogLevel.NORMAL, chalk.blue('📋 What happens next:'));
@@ -316,69 +315,10 @@ export class InitCommand {
     this.log(LogLevel.NORMAL, chalk.green('   franken-ai init\n'));
   }
 
-  private async selectTemplates(stack: any, toolStatus: any, options: InitOptions): Promise<GuidelineTemplate[]> {
-    this.log(LogLevel.NORMAL, chalk.blue('📋 Loading available guidelines...'));
-    
-    try {
-      const templateManager = new TemplateManager();
-      const availableTemplates = await templateManager.getAvailableTemplates(stack, {
-        claude: toolStatus.claude.installed,
-        gemini: toolStatus.gemini.installed,
-      });
-
-      if (availableTemplates.length === 0) {
-        this.log(LogLevel.NORMAL, chalk.yellow('ℹ️  No specific guidelines available for detected stack'));
-        return [];
-      }
-
-      // Auto-select all templates in non-interactive mode
-      if (!this.isInteractive || options.yes) {
-        this.log(LogLevel.NORMAL, chalk.green(`✅ Auto-selected ${availableTemplates.length} guideline templates`));
-        if (this.logLevel >= LogLevel.VERBOSE) {
-          availableTemplates.forEach(template => {
-            this.log(LogLevel.VERBOSE, chalk.gray(`   • ${template.name}`));
-          });
-        }
-        return availableTemplates;
-      }
-
-      // Show available templates and let user select
-      this.log(LogLevel.NORMAL, chalk.blue(`📋 Available guidelines for your stack:\n`));
-      
-      const choices = availableTemplates.map(template => ({
-        name: `${this.getCategoryIcon(template.category)} ${template.name}`,
-        value: template.id,
-        checked: template.enabled,
-        short: template.name,
-      }));
-
-      const { selectedIds } = await inquirer.prompt([
-        {
-          type: 'checkbox',
-          name: 'selectedIds',
-          message: 'Select guidelines to include in CLAUDE.md:',
-          choices,
-          pageSize: 10,
-          validate: (selection: string[]) => {
-            if (selection.length === 0) {
-              return 'Please select at least one guideline';
-            }
-            return true;
-          },
-        },
-      ]);
-
-      const selectedTemplates = availableTemplates.filter(template => 
-        selectedIds.includes(template.id)
-      );
-
-      this.log(LogLevel.NORMAL, chalk.green(`✅ Selected ${selectedTemplates.length} guideline templates`));
-      
-      return selectedTemplates;
-    } catch (error) {
-      this.logError(chalk.red('❌ Failed to load guidelines'));
-      throw error;
-    }
+  private async selectTemplates(stack: any, toolStatus: any, options: InitOptions): Promise<void> {
+    // This method is no longer needed with the new GuidelineManager
+    // Guidelines are automatically selected based on the detected stack
+    this.log(LogLevel.VERBOSE, chalk.gray('Guidelines will be automatically selected based on detected stack'));
   }
 
   private getCategoryIcon(category: string): string {
@@ -416,25 +356,203 @@ export class InitCommand {
   }
 
 
-  private async generateWorkspace(stack: any, options: InitOptions, toolStatus: any, selectedTemplates: GuidelineTemplate[]) {
+  private async generateWorkspace(stack: any, options: InitOptions, toolStatus: any, selectedTemplates: any) {
     this.log(LogLevel.NORMAL, chalk.blue('📝 Generating enhanced CLAUDE.md...'));
-    
+
     try {
-      const generator = new WorkspaceGenerator();
-      await generator.enhance(stack, {
-        includeDocs: options.docs,
-        verbose: this.logLevel >= LogLevel.VERBOSE,
-        availableTools: {
-          claude: toolStatus.claude.installed,
-          gemini: toolStatus.gemini.installed,
-        },
-        selectedTemplates
-      });
-      
+      // Detect versions for context
+      const context: GuidelineContext = {
+        stack,
+        phpVersion: await this.detectPHPVersion(),
+        laravelVersion: await this.detectLaravelVersion(),
+        vueVersion: await this.detectVueVersion(),
+        reactVersion: await this.detectReactVersion(),
+        nextVersion: await this.detectNextVersion(),
+        nuxtVersion: await this.detectNuxtVersion(),
+        svelteVersion: await this.detectSvelteVersion(),
+        svelteKitVersion: await this.detectSvelteKitVersion(),
+      };
+
+      // Use the new GuidelineManager
+      const guidelineManager = new GuidelineManager();
+      const guidelines = await guidelineManager.collectGuidelines(context);
+
+      if (this.logLevel >= LogLevel.VERBOSE && guidelines.length > 0) {
+        this.log(LogLevel.VERBOSE, chalk.gray('Collected guidelines:'));
+        guidelines.forEach(guideline => {
+          this.log(LogLevel.VERBOSE, chalk.gray(`   • ${guideline.path} (${guideline.category})`));
+        });
+      }
+
+      // Generate and write the CLAUDE.md content
+      const content = guidelineManager.generateClaudeContent(guidelines, context);
+      const claudeMdPath = path.join(process.cwd(), 'CLAUDE.md');
+      await fs.writeFile(claudeMdPath, content, 'utf-8');
+
       this.log(LogLevel.NORMAL, chalk.green('✅ Enhanced CLAUDE.md generated'));
+
+      // Show summary
+      const categoryCounts = guidelines.reduce((acc, g) => {
+        acc[g.category] = (acc[g.category] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      Object.entries(categoryCounts).forEach(([category, count]) => {
+        this.log(LogLevel.NORMAL, chalk.gray(`   • ${this.formatCategory(category)}: ${count} guideline${count > 1 ? 's' : ''}`));
+      });
     } catch (error) {
       this.logError(chalk.red('❌ Workspace generation failed'));
       throw error;
     }
+  }
+
+  private formatCategory(category: string): string {
+    return category.charAt(0).toUpperCase() + category.slice(1);
+  }
+
+  private async detectPHPVersion(): Promise<string | undefined> {
+    try {
+      const composerPath = path.join(process.cwd(), 'composer.json');
+      if (await fs.pathExists(composerPath)) {
+        const composer = await fs.readJson(composerPath);
+        const phpRequire = composer.require?.php;
+        if (phpRequire) {
+          // Extract version like "^8.3" -> "8.3"
+          const match = phpRequire.match(/(\d+\.\d+)/);
+          return match ? match[1] : undefined;
+        }
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+    return undefined;
+  }
+
+  private async detectLaravelVersion(): Promise<string | undefined> {
+    try {
+      const composerLockPath = path.join(process.cwd(), 'composer.lock');
+      if (await fs.pathExists(composerLockPath)) {
+        const composerLock = await fs.readJson(composerLockPath);
+        const laravelPackage = composerLock.packages?.find(
+          (pkg: any) => pkg.name === 'laravel/framework'
+        );
+        if (laravelPackage?.version) {
+          // Extract version like "v11.0.0" -> "11"
+          const match = laravelPackage.version.match(/v?(\d+)/);
+          return match ? match[1] : undefined;
+        }
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+    return undefined;
+  }
+
+  private async detectVueVersion(): Promise<string | undefined> {
+    try {
+      const packagePath = path.join(process.cwd(), 'package.json');
+      if (await fs.pathExists(packagePath)) {
+        const packageJson = await fs.readJson(packagePath);
+        const vueVersion = packageJson.dependencies?.vue || packageJson.devDependencies?.vue;
+        if (vueVersion) {
+          // Extract version like "^3.4.0" -> "3"
+          const match = vueVersion.match(/(\d+)/);
+          return match ? match[1] : undefined;
+        }
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+    return undefined;
+  }
+
+  private async detectReactVersion(): Promise<string | undefined> {
+    try {
+      const packagePath = path.join(process.cwd(), 'package.json');
+      if (await fs.pathExists(packagePath)) {
+        const packageJson = await fs.readJson(packagePath);
+        const reactVersion = packageJson.dependencies?.react || packageJson.devDependencies?.react;
+        if (reactVersion) {
+          // Extract version like "^18.2.0" -> "18"
+          const match = reactVersion.match(/(\d+)/);
+          return match ? match[1] : undefined;
+        }
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+    return undefined;
+  }
+
+  private async detectNextVersion(): Promise<string | undefined> {
+    try {
+      const packagePath = path.join(process.cwd(), 'package.json');
+      if (await fs.pathExists(packagePath)) {
+        const packageJson = await fs.readJson(packagePath);
+        const nextVersion = packageJson.dependencies?.next || packageJson.devDependencies?.next;
+        if (nextVersion) {
+          // Extract version like "^14.2.0" -> "14"
+          const match = nextVersion.match(/(\d+)/);
+          return match ? match[1] : undefined;
+        }
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+    return undefined;
+  }
+
+  private async detectNuxtVersion(): Promise<string | undefined> {
+    try {
+      const packagePath = path.join(process.cwd(), 'package.json');
+      if (await fs.pathExists(packagePath)) {
+        const packageJson = await fs.readJson(packagePath);
+        const nuxtVersion = packageJson.dependencies?.nuxt || packageJson.devDependencies?.nuxt;
+        if (nuxtVersion) {
+          // Extract version like "^3.8.0" -> "3"
+          const match = nuxtVersion.match(/(\d+)/);
+          return match ? match[1] : undefined;
+        }
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+    return undefined;
+  }
+
+  private async detectSvelteVersion(): Promise<string | undefined> {
+    try {
+      const packagePath = path.join(process.cwd(), 'package.json');
+      if (await fs.pathExists(packagePath)) {
+        const packageJson = await fs.readJson(packagePath);
+        const svelteVersion = packageJson.dependencies?.svelte || packageJson.devDependencies?.svelte;
+        if (svelteVersion) {
+          // Extract version like "^4.2.0" -> "4" or "^5.0.0" -> "5"
+          const match = svelteVersion.match(/(\d+)/);
+          return match ? match[1] : undefined;
+        }
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+    return undefined;
+  }
+
+  private async detectSvelteKitVersion(): Promise<string | undefined> {
+    try {
+      const packagePath = path.join(process.cwd(), 'package.json');
+      if (await fs.pathExists(packagePath)) {
+        const packageJson = await fs.readJson(packagePath);
+        const svelteKitVersion = packageJson.dependencies?.['@sveltejs/kit'] || packageJson.devDependencies?.['@sveltejs/kit'];
+        if (svelteKitVersion) {
+          // Extract version like "^1.20.0" -> "1" or "^2.0.0" -> "2"
+          const match = svelteKitVersion.match(/(\d+)/);
+          return match ? match[1] : undefined;
+        }
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+    return undefined;
   }
 }

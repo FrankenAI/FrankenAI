@@ -2,11 +2,12 @@
 
 
 [//]: # (franken-ai:stack:start)
-## Detected Stack: Generic
+## Detected Stack: Nuxt.js, Vue.js
 
 ### Project Information
 - **Runtime**: node
-- **Languages**: TypeScript, JavaScript
+- **Languages**: JavaScript
+- **Frameworks**: Nuxt.js, Vue.js
 [//]: # (franken-ai:stack:end)
 
 [//]: # (franken-ai:commands:start)

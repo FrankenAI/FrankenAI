@@ -11,6 +11,8 @@
     "dev": "bun run src/cli.ts",
     "build": "bun run tsc",
     "test": "bun test",
+    "test:modules": "bun run scripts/test-modules.ts",
+    "test:core": "bun test tests/",
     "start": "node dist/cli.js",
     "lint": "bun run eslint src/**/*.ts",
     "lint:fix": "bun run eslint src/**/*.ts --fix",

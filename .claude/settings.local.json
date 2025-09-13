@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "Read(//Volumes/PROG/@playground/megazord/DATA/**)",
+      "Bash(bun run:*)",
+      "Bash(bunx tsc:*)",
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(node:*)",
+      "Bash(bun test:*)",
+      "WebSearch",
+      "Bash(bun:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

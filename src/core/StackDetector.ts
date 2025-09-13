@@ -1,5 +1,8 @@
 import fs from 'fs-extra';
 import path from 'path';
+import { ModuleManager } from './ModuleManager.js';
+import { ModuleRegistry } from './ModuleRegistry.js';
+import type { DetectionContext } from './types/Module.js';
 
 export interface DetectedStack {
   runtime: string;
@@ -20,54 +23,120 @@ export interface StackCommands {
 
 export class StackDetector {
   private projectRoot: string;
+  private moduleManager: ModuleManager;
+  private moduleRegistry: ModuleRegistry;
 
   constructor(projectRoot = process.cwd()) {
     this.projectRoot = projectRoot;
+    this.moduleManager = new ModuleManager();
+    this.moduleRegistry = new ModuleRegistry();
   }
 
   async detect(): Promise<DetectedStack> {
-    const configFiles = await this.findConfigFiles();
-    const languages = await this.detectLanguages(configFiles);
-    const frameworks = await this.detectFrameworks(configFiles);
+    // Initialize modules
+    await this.initializeModules();
+
+    // Prepare detection context
+    const context = await this.createDetectionContext();
+
+    // Run module-based detection
+    const detectionResults = await this.moduleManager.detectStack(context);
+    const versions = await this.moduleManager.detectVersions(context, detectionResults);
+
+    // Extract detected frameworks and languages
+    const frameworks: string[] = [];
+    const languages: string[] = [];
+
+    for (const [moduleId, result] of detectionResults) {
+      const module = this.moduleManager.getModule(moduleId);
+      if (module) {
+        const displayName = module.getMetadata().displayName;
+        if (module.type === 'framework') {
+          frameworks.push(displayName);
+        } else if (module.type === 'language') {
+          languages.push(displayName);
+        }
+      }
+    }
+
     const packageManagers = await this.detectPackageManagers();
-    const runtime = await this.detectRuntime(configFiles);
-    const commands = await this.generateCommands(runtime, frameworks, packageManagers);
+    const runtime = this.determineRuntime(languages, packageManagers);
+    const commands = await this.moduleManager.generateCommands(
+      {
+        projectRoot: this.projectRoot,
+        detectedStack: {
+          runtime,
+          languages,
+          frameworks,
+          packageManagers,
+          configFiles: context.configFiles,
+          commands: { dev: [], build: [], test: [], lint: [], install: [] }
+        },
+        detectionResult: { detected: true, confidence: 1, evidence: [] }
+      },
+      detectionResults
+    );
 
     return {
       runtime,
       languages,
       frameworks,
       packageManagers,
-      configFiles,
+      configFiles: context.configFiles,
       commands,
     };
   }
 
+  private async initializeModules(): Promise<void> {
+    // Discover and register all modules
+    await this.moduleRegistry.discoverModules();
+
+    // Register discovered modules with the manager
+    for (const registration of this.moduleRegistry.getEnabledRegistrations()) {
+      this.moduleManager.register(registration);
+    }
+
+    // Initialize the module manager
+    await this.moduleManager.initialize();
+  }
+
+  private async createDetectionContext(): Promise<DetectionContext> {
+    const configFiles = await this.findConfigFiles();
+    const files = await this.scanProjectFiles();
+    const packageJson = await this.readPackageJson();
+    const composerJson = await this.readComposerJson();
+
+    return {
+      projectRoot: this.projectRoot,
+      configFiles,
+      files,
+      packageJson,
+      composerJson
+    };
+  }
+
   private async findConfigFiles(): Promise<string[]> {
-    const configPatterns = [
-      'package.json',
-      'composer.json',
-      'requirements.txt',
-      'Pipfile',
-      'pyproject.toml',
-      'Cargo.toml',
-      'go.mod',
-      'tsconfig.json',
-      'vite.config.js',
-      'vite.config.ts',
-      'nuxt.config.js',
-      'nuxt.config.ts',
-      'next.config.js',
-      'vue.config.js',
-      'artisan',
-      'manage.py',
-      '.env',
-      'docker-compose.yml',
-      'Dockerfile',
+    // Get config file patterns from all modules
+    const allModules = this.moduleManager.getModules();
+    const configPatterns = new Set<string>();
+
+    // Add module-specific config files
+    for (const module of allModules) {
+      if ('getConfigFiles' in module && typeof module.getConfigFiles === 'function') {
+        const moduleConfigs = module.getConfigFiles();
+        moduleConfigs.forEach((config: string) => configPatterns.add(config));
+      }
+    }
+
+    // Add common config files
+    const commonPatterns = [
+      'package.json', 'composer.json', 'tsconfig.json', '.env',
+      'docker-compose.yml', 'Dockerfile', 'requirements.txt', 'Pipfile',
+      'pyproject.toml', 'Cargo.toml', 'go.mod', 'manage.py'
     ];
+    commonPatterns.forEach(pattern => configPatterns.add(pattern));
 
     const found: string[] = [];
-
     for (const pattern of configPatterns) {
       const fullPath = path.join(this.projectRoot, pattern);
       if (await fs.pathExists(fullPath)) {
@@ -78,87 +147,7 @@ export class StackDetector {
     return found;
   }
 
-  private async detectLanguages(configFiles: string[]): Promise<string[]> {
-    const languages = new Set<string>();
 
-    if (configFiles.includes('package.json')) {
-      languages.add('JavaScript');
-      
-      const packageJson = await this.readPackageJson();
-      if (packageJson?.devDependencies?.typescript || packageJson?.dependencies?.typescript) {
-        languages.add('TypeScript');
-      }
-    }
-
-    if (configFiles.includes('composer.json')) {
-      languages.add('PHP');
-    }
-
-    if (configFiles.some(f => f.includes('requirements.txt') || f.includes('Pipfile') || f.includes('pyproject.toml'))) {
-      languages.add('Python');
-    }
-
-    if (configFiles.includes('Cargo.toml')) {
-      languages.add('Rust');
-    }
-
-    if (configFiles.includes('go.mod')) {
-      languages.add('Go');
-    }
-
-    return Array.from(languages);
-  }
-
-  private async detectFrameworks(configFiles: string[]): Promise<string[]> {
-    const frameworks = new Set<string>();
-
-    if (configFiles.includes('artisan')) {
-      frameworks.add('Laravel');
-    }
-
-    if (configFiles.some(f => f.includes('nuxt.config'))) {
-      frameworks.add('Nuxt.js');
-    }
-
-    if (configFiles.some(f => f.includes('next.config'))) {
-      frameworks.add('Next.js');
-    }
-
-    if (configFiles.includes('vue.config.js')) {
-      frameworks.add('Vue.js');
-    }
-
-    if (configFiles.includes('manage.py')) {
-      frameworks.add('Django');
-    }
-
-    // Check package.json dependencies
-    const packageJson = await this.readPackageJson();
-    if (packageJson) {
-      const allDeps = {
-        ...packageJson.dependencies,
-        ...packageJson.devDependencies,
-      };
-
-      if (allDeps.vue || allDeps['@vue/cli-service']) {
-        frameworks.add('Vue.js');
-      }
-      if (allDeps.react) {
-        frameworks.add('React');
-      }
-      if (allDeps.express) {
-        frameworks.add('Express');
-      }
-      if (allDeps.fastify) {
-        frameworks.add('Fastify');
-      }
-      if (allDeps.nestjs || allDeps['@nestjs/core']) {
-        frameworks.add('NestJS');
-      }
-    }
-
-    return Array.from(frameworks);
-  }
 
   private async detectPackageManagers(): Promise<string[]> {
     const managers = new Set<string>();
@@ -182,84 +171,18 @@ export class StackDetector {
     return Array.from(managers);
   }
 
-  private async detectRuntime(configFiles: string[]): Promise<string> {
-    if (configFiles.includes('bun.lockb')) return 'bun';
-    if (configFiles.includes('package.json')) return 'node';
-    if (configFiles.includes('composer.json')) return 'php';
-    if (configFiles.some(f => f.includes('requirements.txt') || f.includes('Pipfile'))) return 'python';
-    if (configFiles.includes('Cargo.toml')) return 'rust';
-    if (configFiles.includes('go.mod')) return 'go';
-    
-    return 'generic';
+  private determineRuntime(languages: string[], packageManagers: string[]): string {
+    if (packageManagers.includes('bun')) return 'bun';
+    if (packageManagers.includes('npm') || packageManagers.includes('yarn') || packageManagers.includes('pnpm')) return 'node';
+    if (packageManagers.includes('composer')) return 'php';
+
+    // Fallback to language-based runtime detection
+    if (languages.includes('JavaScript') || languages.includes('TypeScript')) return 'node';
+    if (languages.includes('PHP')) return 'php';
+
+    return 'node';
   }
 
-  private async generateCommands(
-    runtime: string,
-    frameworks: string[],
-    packageManagers: string[]
-  ): Promise<StackCommands> {
-    const packageManager = this.getPreferredPackageManager(packageManagers, runtime);
-    
-    const commands: StackCommands = {
-      dev: [],
-      build: [],
-      test: [],
-      lint: [],
-      install: [],
-    };
-
-    // Install commands
-    switch (packageManager) {
-      case 'bun':
-        commands.install.push('bun install');
-        break;
-      case 'yarn':
-        commands.install.push('yarn install');
-        break;
-      case 'pnpm':
-        commands.install.push('pnpm install');
-        break;
-      case 'composer':
-        commands.install.push('composer install');
-        break;
-      default:
-        commands.install.push('npm install');
-    }
-
-    // Framework-specific commands
-    if (frameworks.includes('Laravel')) {
-      commands.dev.push('php artisan serve');
-      commands.test.push('php artisan test');
-      commands.build.push('php artisan optimize');
-    }
-
-    if (frameworks.includes('Nuxt.js')) {
-      commands.dev.push(`${packageManager} run dev`);
-      commands.build.push(`${packageManager} run build`);
-      commands.test.push(`${packageManager} run test`);
-    }
-
-    if (frameworks.includes('Next.js')) {
-      commands.dev.push(`${packageManager} run dev`);
-      commands.build.push(`${packageManager} run build`);
-      commands.test.push(`${packageManager} run test`);
-    }
-
-    // Generic Node.js commands
-    if (runtime === 'node' || runtime === 'bun') {
-      const packageJson = await this.readPackageJson();
-      if (packageJson?.scripts) {
-        const scripts = packageJson.scripts;
-        
-        if (scripts.dev) commands.dev.push(`${packageManager} run dev`);
-        if (scripts.build) commands.build.push(`${packageManager} run build`);
-        if (scripts.test) commands.test.push(`${packageManager} run test`);
-        if (scripts.lint) commands.lint.push(`${packageManager} run lint`);
-      }
-    }
-
-    return commands;
-  }
 
   private getPreferredPackageManager(packageManagers: string[], runtime: string): string {
     if (runtime === 'bun' && packageManagers.includes('bun')) return 'bun';
@@ -280,4 +203,52 @@ export class StackDetector {
     }
     return null;
   }
+
+  private async readComposerJson(): Promise<any> {
+    try {
+      const composerPath = path.join(this.projectRoot, 'composer.json');
+      if (await fs.pathExists(composerPath)) {
+        return await fs.readJson(composerPath);
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+    return null;
+  }
+
+
+  private async scanProjectFiles(): Promise<string[]> {
+    const files: string[] = [];
+
+    const scanDirectory = async (dir: string, depth = 0): Promise<void> => {
+      if (depth > 3) return; // Limit recursion depth
+
+      try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          const relativePath = path.relative(this.projectRoot, fullPath);
+
+          // Skip node_modules, vendor, and other common ignored directories
+          if (entry.name.startsWith('.') ||
+              ['node_modules', 'vendor', 'dist', 'build', 'public', '__pycache__'].includes(entry.name)) {
+            continue;
+          }
+
+          if (entry.isDirectory()) {
+            await scanDirectory(fullPath, depth + 1);
+          } else if (entry.isFile()) {
+            files.push(relativePath);
+          }
+        }
+      } catch (error) {
+        // Ignore permission errors or other issues
+      }
+    };
+
+    await scanDirectory(this.projectRoot);
+    return files;
+  }
+
 }

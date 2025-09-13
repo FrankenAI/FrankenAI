@@ -2,11 +2,12 @@
 
 
 [//]: # (franken-ai:stack:start)
-## Detected Stack: Generic
+## Detected Stack: React
 
 ### Project Information
 - **Runtime**: node
-- **Languages**: TypeScript, JavaScript
+- **Languages**: JavaScript
+- **Frameworks**: React
 [//]: # (franken-ai:stack:end)
 
 [//]: # (franken-ai:commands:start)
@@ -20,9 +21,11 @@
 
 ### Testing
 - `npm run test` - Run tests
+- `npm run test:watch` - Run tests in watch mode
 
 ### Linting
 - `npm run lint` - Run linter
+- `npm run lint:fix` - Fix linting issues
 
 ### Package Management
 - `npm install` - Install dependencies

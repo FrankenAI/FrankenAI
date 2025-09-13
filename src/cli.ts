@@ -33,21 +33,15 @@ program
     }
   });
 
-// Update command - regenerate sections
+// Update command - regenerate sections (coming soon)
 program
   .command('update [section]')
   .description('🔄 Update specific sections in CLAUDE.md')
   .option('-f, --force', 'Force update without confirmation')
   .option('-v, --verbose', 'Show detailed output')
   .action(async (section, options) => {
-    try {
-      const { UpdateCommand } = await import('./commands/UpdateCommand.js');
-      const updateCommand = new UpdateCommand();
-      await updateCommand.execute(section, options);
-    } catch (error) {
-      console.error(chalk.red('❌ Error:'), error instanceof Error ? error.message : error);
-      process.exit(1);
-    }
+    console.log(chalk.yellow('🚧 Coming soon: Selective section updates'));
+    console.log(chalk.gray('   For now, use: franken-ai init --force'));
   });
 
 // Status command
