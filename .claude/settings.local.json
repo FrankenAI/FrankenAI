@@ -10,7 +10,9 @@
       "Bash(node:*)",
       "Bash(bun test:*)",
       "WebSearch",
-      "Bash(bun:*)"
+      "Bash(bun:*)",
+      "Bash(grep:*)",
+      "Read(//Volumes/PROG/@playground/megazord/**)"
     ],
     "deny": [],
     "ask": []

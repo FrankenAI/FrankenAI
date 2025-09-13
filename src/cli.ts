@@ -2,36 +2,35 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { CommandRegistry } from './core/CommandRegistry.js';
 import { InitCommand } from './commands/InitCommand.js';
+import { ModulesCommand } from './commands/ModulesCommand.js';
+import { ListCommand } from './commands/ListCommand.js';
+import { AboutCommand } from './commands/AboutCommand.js';
 
 const program = new Command();
+const commandRegistry = new CommandRegistry();
 
 program
   .name('franken-ai')
   .description('🧟 Multi-headed AI development assistant combining Claude Code + Gemini CLI')
   .version('0.1.0');
 
-// Init command - main entry point
-program
-  .command('init')
-  .description('🚀 Initialize FrankenAI in current project')
-  .option('--docs', 'Synthesize framework documentation')
-  .option('-f, --force', 'Force overwrite existing CLAUDE.md without asking')
-  .option('--safe', 'Stop if CLAUDE.md already exists (no overwrite)')
-  .option('-v, --verbose', 'Show detailed output')
-  .option('-q, --quiet', 'Minimal output (errors and warnings only)')
-  .option('--silent', 'No output except prompts')
-  .option('-y, --yes', 'Auto-accept all prompts')
-  .option('--no-interaction', 'Non-interactive mode (fail if input needed)')
-  .action(async (options) => {
-    try {
-      const initCommand = new InitCommand();
-      await initCommand.execute(options);
-    } catch (error) {
-      console.error(chalk.red('❌ Error:'), error instanceof Error ? error.message : error);
-      process.exit(1);
-    }
-  });
+// Register all commands
+const initCommand = new InitCommand();
+const modulesCommand = new ModulesCommand();
+const listCommand = new ListCommand(commandRegistry);
+const aboutCommand = new AboutCommand();
+
+commandRegistry.register(initCommand);
+commandRegistry.register(modulesCommand);
+commandRegistry.register(listCommand);
+commandRegistry.register(aboutCommand);
+
+// Configure all registered commands with Commander.js
+commandRegistry.getAllCommands().forEach(command => {
+  command.configure(program);
+});
 
 // Update command - regenerate sections (coming soon)
 program

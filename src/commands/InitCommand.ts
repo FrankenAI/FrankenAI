@@ -6,6 +6,8 @@ import path from 'path';
 import { EnvironmentChecker } from '../core/EnvironmentChecker.js';
 import { StackDetector } from '../core/StackDetector.js';
 import { GuidelineManager, type GuidelineContext } from '../core/GuidelineManager.js';
+import type { BaseCommand, CommandSignature } from '../core/types/Command.js';
+import type { Command } from 'commander';
 
 export interface InitOptions {
   docs?: boolean;
@@ -25,9 +27,106 @@ export enum LogLevel {
   VERBOSE = 3,
 }
 
-export class InitCommand {
+export class InitCommand implements BaseCommand {
   private logLevel: LogLevel = LogLevel.NORMAL;
   private isInteractive = true;
+
+  /**
+   * Get command signature metadata
+   */
+  getSignature(): CommandSignature {
+    return {
+      name: 'init',
+      description: 'Initialize FrankenAI in current project',
+      category: 'Setup',
+      usage: [
+        'franken-ai init',
+        'franken-ai init --docs',
+        'franken-ai init --force --verbose',
+        'franken-ai init --yes --no-interaction'
+      ],
+      options: [
+        {
+          flags: '--docs',
+          description: 'Synthesize framework documentation'
+        },
+        {
+          flags: '-f, --force',
+          description: 'Force overwrite existing CLAUDE.md without asking'
+        },
+        {
+          flags: '--safe',
+          description: 'Stop if CLAUDE.md already exists (no overwrite)'
+        },
+        {
+          flags: '-v, --verbose',
+          description: 'Show detailed output'
+        },
+        {
+          flags: '-q, --quiet',
+          description: 'Minimal output (errors and warnings only)'
+        },
+        {
+          flags: '--silent',
+          description: 'No output except prompts'
+        },
+        {
+          flags: '-y, --yes',
+          description: 'Auto-accept all prompts'
+        },
+        {
+          flags: '--no-interaction',
+          description: 'Non-interactive mode (fail if input needed)'
+        }
+      ],
+      help: `Initialize FrankenAI configuration in your current project.
+
+This command detects your project stack (frameworks, languages, runtime) and
+creates an enhanced CLAUDE.md file with framework-specific guidelines and
+AI workflow configurations.
+
+The init process:
+1. Checks for existing CLAUDE.md (prompts for overwrite if needed)
+2. Verifies Claude Code and Gemini CLI installation
+3. Detects your project stack (React, Laravel, etc.)
+4. Generates optimized CLAUDE.md with relevant guidelines
+5. Configures hybrid Claude Code + Gemini CLI workflow
+
+Options combinations:
+  --force          Overwrite existing files without prompting
+  --safe           Fail if CLAUDE.md exists (good for CI/CD)
+  --yes            Auto-accept all prompts (non-destructive)
+  --no-interaction Fail if any user input needed (CI/CD mode)
+  --verbose        Show detailed detection and generation logs
+  --quiet          Only show warnings and errors
+  --silent         Minimal output for automation
+
+Examples:
+  franken-ai init                    # Interactive setup
+  franken-ai init --force --verbose # Overwrite with detailed logs
+  franken-ai init --yes --docs       # Auto-accept, include docs
+  franken-ai init --no-interaction   # CI/CD mode (fails on conflicts)`
+    };
+  }
+
+  /**
+   * Configure the command
+   */
+  configure(program: Command): void {
+    const signature = this.getSignature();
+
+    program
+      .command(signature.name)
+      .description(signature.description);
+
+    // Add options from signature
+    const cmd = program.commands[program.commands.length - 1];
+    signature.options?.forEach(opt => {
+      cmd.option(opt.flags, opt.description, opt.defaultValue);
+    });
+
+    cmd.action((options: InitOptions) => this.execute(options));
+  }
 
   async execute(options: InitOptions) {
     // Setup logging and interaction levels
