@@ -1,6 +1,6 @@
 {
   "name": "franken-ai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Multi-headed AI development assistant combining Claude Code + Gemini CLI",
   "main": "dist/franken.js",
   "type": "module",
