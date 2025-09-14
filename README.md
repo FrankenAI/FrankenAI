@@ -156,6 +156,20 @@ franken --help
 - **TypeScript** - Typed JavaScript
 - **PHP** - Server-side language
 
+## Inspiration
+
+FrankenAI was inspired by a [Reddit discussion about Gemini CLI's potential](https://www.reddit.com/r/ChatGPTCoding/comments/1lm3fxq/gemini_cli_is_awesome_but_only_when_you_make/) when properly integrated into development workflows. The hybrid workflow concept emerged from recognizing that:
+
+- **Gemini CLI** excels at large-scale codebase analysis with its massive context window
+- **Claude Code** provides precise implementation with excellent development tooling
+- **Combining both** creates a powerful "Megazord" that leverages each tool's strengths
+
+The guideline methodology follows the **Laravel Boost** approach:
+- Security-first patterns
+- Concise, actionable guidelines
+- Convention over configuration
+- Framework-specific best practices
+
 ## How It Works
 
 1. **Stack Detection** - Analyzes package.json, config files, and project structure
@@ -173,6 +187,15 @@ franken modules       # List available modules
 franken status        # Show configuration status
 franken --help        # Show help
 ```
+
+## Author
+
+Developed by [Québec Studio](https://quebecstudio.com)
+
+## Acknowledgments
+
+- Guideline methodology inspired by [Laravel Boost](https://github.com/laravel/boost)
+- Community insights from [Reddit discussion on Gemini CLI](https://www.reddit.com/r/ChatGPTCoding/comments/1lm3fxq/gemini_cli_is_awesome_but_only_when_you_make/)
 
 ## Contributing
 
