@@ -41,13 +41,13 @@
   ],
   "author": "Québec Studio",
   "license": "MIT",
-  "homepage": "https://github.com/franken-ai/franken-ai#readme",
+  "homepage": "https://github.com/FrankenAI/FrankenAI#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/franken-ai/franken-ai.git"
+    "url": "git+https://github.com/FrankenAI/FrankenAI.git"
   },
   "bugs": {
-    "url": "https://github.com/franken-ai/franken-ai/issues"
+    "url": "https://github.com/FrankenAI/FrankenAI/issues"
   },
   "dependencies": {
     "chalk": "^5.3.0",
