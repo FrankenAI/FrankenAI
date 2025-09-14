@@ -50,7 +50,7 @@ pnpm add --save-dev @franken-ai/franken-ai
 
 ```bash
 # Clone and install for development
-git clone <repo-url> franken-ai
+git clone https://github.com/FrankenAI/FrankenAI.git franken-ai
 cd franken-ai
 bun install
 bun run build
