@@ -78,3 +78,8 @@ temp/
 # Test output
 test-results/
 test-project/
+
+# Development tracking (not for distribution)
+PROJECT_STATUS.md
+TASKS.md
+TODO.md

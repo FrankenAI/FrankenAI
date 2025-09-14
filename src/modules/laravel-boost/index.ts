@@ -1,1 +1,4 @@
-export { LaravelBoostModule } from './LaravelBoostModule.js';
+import { LaravelBoostModule } from './LaravelBoostModule.js';
+
+export default new LaravelBoostModule();
+export { LaravelBoostModule };

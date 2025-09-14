@@ -2,18 +2,18 @@
   "name": "franken-ai",
   "version": "0.1.0",
   "description": "Multi-headed AI development assistant combining Claude Code + Gemini CLI",
-  "main": "dist/cli.js",
+  "main": "dist/franken.js",
   "type": "module",
   "bin": {
-    "franken-ai": "bin/franken-ai"
+    "franken": "bin/franken"
   },
   "scripts": {
-    "dev": "bun run src/cli.ts",
+    "dev": "bun run src/franken.ts",
     "build": "bun run tsc",
     "test": "bun test",
     "test:modules": "bun test src/modules/*/tests/*.test.ts",
     "test:core": "bun test tests/",
-    "start": "node dist/cli.js",
+    "start": "node dist/franken.js",
     "lint": "bun run eslint src/**/*.ts",
     "lint:fix": "bun run eslint src/**/*.ts --fix",
     "format": "bun run prettier --write src/**/*.ts",
@@ -29,10 +29,26 @@
     "gemini",
     "development",
     "cli",
-    "workspace"
+    "workspace",
+    "franken-ai",
+    "multi-ai",
+    "laravel",
+    "react",
+    "vue",
+    "svelte",
+    "nextjs",
+    "typescript"
   ],
   "author": "Québec Studio",
   "license": "MIT",
+  "homepage": "https://github.com/your-org/franken-ai#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/franken-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/franken-ai/issues"
+  },
   "dependencies": {
     "chalk": "^5.3.0",
     "cli-table3": "^0.6.5",
@@ -63,8 +79,13 @@
     "node": ">=18.0.0"
   },
   "files": [
-    "dist",
-    "bin",
-    "templates"
-  ]
+    "dist/**/*",
+    "bin/**/*",
+    "README.md",
+    "LICENSE",
+    "CONTRIBUTING.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

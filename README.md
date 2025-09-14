@@ -20,14 +20,42 @@ FrankenAI orchestrates multiple AI tools to create a powerful "Megazord" for dev
 
 ## Installation
 
+### Global Installation (Recommended)
+
 ```bash
-# Clone and install
+# Install globally via npm
+npm install -g franken-ai
+
+# Or via Yarn
+yarn global add franken-ai
+
+# Or via pnpm
+pnpm install -g franken-ai
+```
+
+### Local Installation (Project-specific)
+
+```bash
+# Install as dev dependency
+npm install --save-dev franken-ai
+
+# Or via Yarn
+yarn add --dev franken-ai
+
+# Or via pnpm
+pnpm add --save-dev franken-ai
+```
+
+### Development Installation
+
+```bash
+# Clone and install for development
 git clone <repo-url> franken-ai
 cd franken-ai
 bun install
 bun run build
 
-# Make globally available (optional)
+# Link for global development use
 npm link
 ```
 
@@ -35,15 +63,47 @@ npm link
 
 ### Initialize Project
 
+**Global Installation:**
 ```bash
 # Auto-detect stack and generate CLAUDE.md
-franken-ai init
+franken init
 
 # Force overwrite existing CLAUDE.md
-franken-ai init --force
+franken init --force
 
 # Quiet mode
-franken-ai init --quiet --yes
+franken init --quiet --yes
+```
+
+**Local Installation (via npm scripts):**
+```bash
+# Add to package.json scripts:
+{
+  "scripts": {
+    "franken": "franken"
+  }
+}
+
+# Then use:
+npm run franken init
+# or
+npx franken init
+```
+
+### Other Commands
+
+```bash
+# Detect project stack without writing files
+franken detect
+
+# List available modules
+franken modules
+
+# Show project status
+franken status
+
+# Get help
+franken --help
 ```
 
 ### Hybrid Workflow
@@ -71,6 +131,7 @@ franken-ai init --quiet --yes
 - **Nuxt.js** - Vue-based full-stack framework with Gemini CLI guidelines
 
 ### Laravel Ecosystem ✅ Implemented
+- **Laravel Boost** - Meta-framework methodology (excludes individual Laravel tools to avoid conflicts)
 - **Inertia.js** - Modern monolith approach (Vue/React/Svelte adapters)
 - **Livewire** - Full-stack framework for Laravel
 - **Volt** - Functional API for Livewire (extends Livewire)
@@ -130,11 +191,13 @@ The hybrid workflow concept emerged from recognizing that:
 
 1. **Module Loading** - Automatically loads framework and language modules from `src/modules/`
 2. **Stack Detection** - Each module detects its presence using package.json dependencies and config files
-3. **Module Prioritization** - Modules are sorted by priority (high → medium → low), then by type (framework → language), then alphabetically
-4. **Guideline Assembly** - Enabled modules provide embedded guidelines and best practices
-5. **CLAUDE.md Generation** - Combines applicable guidelines into a comprehensive workspace configuration file
-6. **Command Generation** - Generates framework-specific development commands and workflow patterns
-7. **Hybrid AI Workflow** - Provides optimized usage patterns for Claude Code + Gemini CLI integration
+3. **Module Prioritization** - Modules are sorted by priority (meta-framework → framework → laravel-tool → specialized-lang → base-lang)
+4. **Conflict Resolution** - Meta-frameworks like Laravel Boost automatically exclude conflicting modules to ensure consistency
+5. **Visual Notifications** - Users receive clear warnings when meta-frameworks take precedence over individual tools
+6. **Guideline Assembly** - Enabled modules provide embedded guidelines and best practices
+7. **CLAUDE.md Generation** - Combines applicable guidelines into a comprehensive workspace configuration file
+8. **Command Generation** - Generates framework-specific development commands and workflow patterns
+9. **Hybrid AI Workflow** - Provides optimized usage patterns for Claude Code + Gemini CLI integration
 
 ## Project Structure
 
@@ -149,6 +212,7 @@ src/
 │   └── EnvironmentChecker.ts # AI tool availability checking
 ├── modules/
 │   ├── laravel/             # Laravel framework module
+│   ├── laravel-boost/       # Laravel Boost meta-framework (excludes Laravel tools)
 │   ├── react/               # React library module
 │   ├── vue/                 # Vue.js framework module
 │   ├── svelte/              # Svelte framework module
@@ -165,7 +229,6 @@ src/
 │   ├── pest/                # Pest PHP testing framework
 │   ├── phpunit/             # PHPUnit testing framework
 │   ├── pint/                # Laravel Pint code style
-│   ├── herd/                # Laravel Herd development
 │   ├── tailwind/            # Tailwind CSS framework
 │   ├── bootstrap/           # Bootstrap CSS framework
 │   ├── bulma/               # Bulma CSS framework
@@ -238,8 +301,8 @@ bun run build
 # Run tests
 bun test
 
-# Test locally
-./dist/cli.js init --verbose
+# Test locally (after build)
+franken init --verbose
 ```
 
 ## Important Disclaimer

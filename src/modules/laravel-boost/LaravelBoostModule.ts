@@ -49,7 +49,7 @@ export class LaravelBoostModule implements LibraryModule {
     paths.push({
       path: 'laravel-boost/guidelines/methodology.md',
       priority: 'meta-framework',
-      category: 'methodology',
+      category: 'framework',
       version
     });
 

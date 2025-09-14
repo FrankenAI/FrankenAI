@@ -44,6 +44,7 @@ export class LaravelBoostDetection {
         'pint', // Boost includes code style
         'volt', // Boost includes Volt patterns
         'folio', // Boost includes routing patterns
+        'pennant', // Boost includes feature flag patterns
         'flux-free', // Boost may include UI patterns
         'flux-pro' // Boost may include advanced UI
       ];

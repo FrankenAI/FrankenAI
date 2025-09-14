@@ -3,6 +3,7 @@ import type {
   Module,
   FrameworkModule,
   LanguageModule,
+  LibraryModule,
   ModuleRegistration,
   ModuleConfig,
   DetectionContext,
@@ -179,6 +180,22 @@ export class ModuleManager extends EventEmitter {
         throw new Error('Language module must implement getSupportedExtensions()');
       }
     }
+
+    if (module.type === 'library') {
+      const libraryModule = module as LibraryModule;
+      if (typeof libraryModule.detect !== 'function') {
+        throw new Error('Library module must implement detect()');
+      }
+      if (typeof libraryModule.detectVersion !== 'function') {
+        throw new Error('Library module must implement detectVersion()');
+      }
+      if (typeof libraryModule.getGuidelinePaths !== 'function') {
+        throw new Error('Library module must implement getGuidelinePaths()');
+      }
+      if (typeof libraryModule.generateCommands !== 'function') {
+        throw new Error('Library module must implement generateCommands()');
+      }
+    }
   }
 
   /**
@@ -207,7 +224,7 @@ export class ModuleManager extends EventEmitter {
   /**
    * Get loaded modules by type
    */
-  getModulesByType<T extends Module>(type: 'framework' | 'language'): T[] {
+  getModulesByType<T extends Module>(type: 'framework' | 'language' | 'library'): T[] {
     return this.getModules()
       .filter(module => module.type === type) as T[];
   }
@@ -237,9 +254,14 @@ export class ModuleManager extends EventEmitter {
         if (module.type === 'framework') {
           const frameworkModule = module as FrameworkModule;
           result = await frameworkModule.detect(context);
-        } else {
+        } else if (module.type === 'language') {
           const languageModule = module as LanguageModule;
           result = await languageModule.detect(context);
+        } else if (module.type === 'library') {
+          const libraryModule = module as LibraryModule;
+          result = await libraryModule.detect(context);
+        } else {
+          throw new Error(`Unknown module type: ${module.type}`);
         }
 
         if (result.detected) {
@@ -294,9 +316,12 @@ export class ModuleManager extends EventEmitter {
         if (module.type === 'framework') {
           const frameworkModule = module as FrameworkModule;
           version = await frameworkModule.detectVersion(context);
-        } else {
+        } else if (module.type === 'language') {
           const languageModule = module as LanguageModule;
           version = await languageModule.detectVersion(context);
+        } else if (module.type === 'library') {
+          const libraryModule = module as LibraryModule;
+          version = await libraryModule.detectVersion(context);
         }
 
         if (version) {
@@ -326,14 +351,17 @@ export class ModuleManager extends EventEmitter {
         if (!module) return;
 
         const version = versions.get(moduleId);
-        let paths: GuidelinePath[];
+        let paths: GuidelinePath[] = [];
 
         if (module.type === 'framework') {
           const frameworkModule = module as FrameworkModule;
           paths = await frameworkModule.getGuidelinePaths(version);
-        } else {
+        } else if (module.type === 'language') {
           const languageModule = module as LanguageModule;
           paths = await languageModule.getGuidelinePaths(version);
+        } else if (module.type === 'library') {
+          const libraryModule = module as LibraryModule;
+          paths = await libraryModule.getGuidelinePaths(version);
         }
 
         allPaths.push(...paths);
@@ -366,7 +394,12 @@ export class ModuleManager extends EventEmitter {
     const frameworkModules = this.getModulesByType<FrameworkModule>('framework')
       .filter(module => detectionResults.has(module.id));
 
-    const commandPromises = frameworkModules.map(async (module) => {
+    const libraryModules = this.getModulesByType<LibraryModule>('library')
+      .filter(module => detectionResults.has(module.id));
+
+    const allModulesWithCommands = [...frameworkModules, ...libraryModules];
+
+    const commandPromises = allModulesWithCommands.map(async (module) => {
       try {
         const moduleCommands = await module.generateCommands(context);
 
@@ -421,6 +454,7 @@ export class ModuleManager extends EventEmitter {
     loaded: number;
     frameworks: number;
     languages: number;
+    libraries: number;
     enabled: number;
   } {
     const modules = this.getModules();
@@ -430,6 +464,7 @@ export class ModuleManager extends EventEmitter {
       loaded: modules.length,
       frameworks: modules.filter(m => m.type === 'framework').length,
       languages: modules.filter(m => m.type === 'language').length,
+      libraries: modules.filter(m => m.type === 'library').length,
       enabled: Array.from(this.registrations.values()).filter(r => r.enabled).length
     };
   }
