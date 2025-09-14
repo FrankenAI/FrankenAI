@@ -1,5 +1,5 @@
 {
-  "name": "franken-ai",
+  "name": "@franken-ai/franken-ai",
   "version": "0.1.2",
   "description": "Multi-headed AI development assistant combining Claude Code + Gemini CLI",
   "main": "dist/franken.js",
@@ -41,13 +41,13 @@
   ],
   "author": "Québec Studio",
   "license": "MIT",
-  "homepage": "https://github.com/your-org/franken-ai#readme",
+  "homepage": "https://github.com/franken-ai/franken-ai#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/franken-ai.git"
+    "url": "git+https://github.com/franken-ai/franken-ai.git"
   },
   "bugs": {
-    "url": "https://github.com/your-org/franken-ai/issues"
+    "url": "https://github.com/franken-ai/franken-ai/issues"
   },
   "dependencies": {
     "chalk": "^5.3.0",
