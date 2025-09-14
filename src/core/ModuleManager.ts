@@ -5,7 +5,6 @@ import type {
   LanguageModule,
   ModuleRegistration,
   ModuleConfig,
-  ModuleEvents,
   DetectionContext,
   DetectionResult,
   ModuleContext,
@@ -117,7 +116,9 @@ export class ModuleManager extends EventEmitter {
           }
         };
 
-        await module.initialize(context);
+        if (module.initialize) {
+          await module.initialize(context);
+        }
       }
 
       this.emit('module:loaded', { module });
@@ -134,11 +135,11 @@ export class ModuleManager extends EventEmitter {
       throw new Error('Module must have an id');
     }
 
-    if (!module.type || !['framework', 'language'].includes(module.type)) {
-      throw new Error('Module must have a valid type (framework or language)');
+    if (!module.type || !['framework', 'language', 'library'].includes(module.type)) {
+      throw new Error('Module must have a valid type (framework, language, or library)');
     }
 
-    if (!module.priorityType || !['meta-framework', 'framework', 'specialized-lang', 'base-lang'].includes(module.priorityType)) {
+    if (!module.priorityType || !['meta-framework', 'framework', 'css-framework', 'laravel-tool', 'specialized-lang', 'base-lang'].includes(module.priorityType)) {
       throw new Error('Module must have a valid priorityType');
     }
 
@@ -192,8 +193,10 @@ export class ModuleManager extends EventEmitter {
    */
   private sortByPriority = (a: Module, b: Module): number => {
     const priorityOrder: Record<ModulePriorityType, number> = {
-      'meta-framework': 4,
-      'framework': 3,
+      'meta-framework': 6,
+      'framework': 5,
+      'css-framework': 4,
+      'laravel-tool': 3,
       'specialized-lang': 2,
       'base-lang': 1
     };
@@ -223,6 +226,7 @@ export class ModuleManager extends EventEmitter {
     this.emit('detection:start', { context });
 
     const results = new Map<string, DetectionResult>();
+    const exclusions = new Set<string>();
 
     // Run detection for all modules
     const modules = this.getModules();
@@ -240,6 +244,13 @@ export class ModuleManager extends EventEmitter {
 
         if (result.detected) {
           results.set(module.id, result);
+
+          // If this module excludes other modules, add them to exclusions
+          if (result.excludes && result.excludes.length > 0) {
+            result.excludes.forEach(excludedId => {
+              exclusions.add(excludedId);
+            });
+          }
         }
       } catch (error) {
         console.error(`Detection failed for module ${module.id}:`, error);
@@ -249,7 +260,18 @@ export class ModuleManager extends EventEmitter {
 
     await Promise.all(detectionPromises);
 
-    this.emit('detection:complete', { results });
+    // Remove excluded modules from results
+    if (exclusions.size > 0) {
+      for (const excludedId of exclusions) {
+        if (results.has(excludedId)) {
+          const excludedResult = results.get(excludedId);
+          results.delete(excludedId);
+          console.log(`Module ${excludedId} excluded by higher-priority module (confidence: ${excludedResult?.confidence})`);
+        }
+      }
+    }
+
+    this.emit('detection:complete', { results, exclusions: Array.from(exclusions) });
     return results;
   }
 

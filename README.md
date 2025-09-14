@@ -62,13 +62,35 @@ franken-ai init --quiet --yes
 ## Currently Supported Stacks
 
 ### Frameworks ✅ Implemented
-- **Laravel** - PHP framework with detection and guidelines
+- **Laravel** - PHP framework with comprehensive ecosystem support
 - **React** - JavaScript library with component patterns
 - **Vue.js** - Progressive JavaScript framework
 - **Svelte** - Compile-time optimized framework
 - **SvelteKit** - Full-stack Svelte framework
-- **Next.js** - React-based full-stack framework
-- **Nuxt.js** - Vue-based full-stack framework
+- **Next.js** - React-based full-stack framework with Gemini CLI guidelines
+- **Nuxt.js** - Vue-based full-stack framework with Gemini CLI guidelines
+
+### Laravel Ecosystem ✅ Implemented
+- **Inertia.js** - Modern monolith approach (Vue/React/Svelte adapters)
+- **Livewire** - Full-stack framework for Laravel
+- **Volt** - Functional API for Livewire (extends Livewire)
+- **Folio** - Page-based routing for Laravel
+- **FluxUI Free** - Free UI components for Livewire
+- **FluxUI Pro** - Premium UI components for Livewire (excludes Free)
+- **Pennant** - Feature flags for Laravel
+
+### Testing Frameworks ✅ Implemented
+- **Pest** - Modern PHP testing framework (excludes PHPUnit)
+- **PHPUnit** - Traditional PHP testing framework
+
+### Development Tools ✅ Implemented
+- **Pint** - Laravel code style fixer
+- **Herd** - Laravel development environment
+
+### CSS Frameworks ✅ Implemented
+- **Tailwind CSS** - Utility-first CSS framework (v3.x, v4.x)
+- **Bootstrap** - Popular CSS framework (v4.x, v5.x)
+- **Bulma** - Modern CSS framework based on Flexbox
 
 ### Languages ✅ Implemented
 - **JavaScript** - Core language support with modern patterns
@@ -86,9 +108,6 @@ franken-ai init --quiet --yes
 
 **Languages:**
 - Python, Ruby, Go, Rust, Java, C#
-
-**Styling:**
-- Tailwind CSS, Bootstrap integration
 
 ## Inspiration & Origins
 
@@ -136,12 +155,29 @@ src/
 │   ├── sveltekit/           # SvelteKit framework module
 │   ├── next/                # Next.js framework module
 │   ├── nuxt/                # Nuxt.js framework module
+│   ├── inertia/             # Inertia.js Laravel tool
+│   ├── livewire/            # Livewire Laravel tool
+│   ├── volt/                # Livewire Volt functional API
+│   ├── folio/               # Laravel Folio page routing
+│   ├── flux-free/           # Flux UI Free components
+│   ├── flux-pro/            # Flux UI Pro components
+│   ├── pennant/             # Laravel Pennant feature flags
+│   ├── pest/                # Pest PHP testing framework
+│   ├── phpunit/             # PHPUnit testing framework
+│   ├── pint/                # Laravel Pint code style
+│   ├── herd/                # Laravel Herd development
+│   ├── tailwind/            # Tailwind CSS framework
+│   ├── bootstrap/           # Bootstrap CSS framework
+│   ├── bulma/               # Bulma CSS framework
 │   ├── php/                 # PHP language module
 │   ├── javascript/          # JavaScript language module
 │   └── typescript/          # TypeScript language module
 └── commands/
     ├── InitCommand.ts       # Project initialization
     ├── ModulesCommand.ts    # Module listing and info
+    ├── DetectCommand.ts     # Stack detection
+    ├── StatusCommand.ts     # Configuration status
+    ├── UpdateCommand.ts     # CLAUDE.md updates
     ├── ListCommand.ts       # Command listing
     └── AboutCommand.ts      # Project information
 ```

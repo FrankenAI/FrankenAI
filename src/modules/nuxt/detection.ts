@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import type { DetectionContext, DetectionResult } from '../../core/types/Module.js';
+import { VersionUtils, type NpmVersionInfo } from '../../core/utils/VersionUtils.js';
 
 /**
  * Nuxt.js detection utilities
@@ -79,10 +80,13 @@ export class NuxtDetection {
     // Ensure confidence doesn't exceed 1.0
     confidence = Math.min(confidence, 1.0);
 
+    const detected = confidence > 0.3;
+
     return {
-      detected: confidence > 0.3,
+      detected,
       confidence,
-      evidence,
+      evidence: detected ? [...evidence, 'Nuxt.js includes Vue.js - excluding standalone Vue guidelines'] : evidence,
+      excludes: detected ? ['vue'] : undefined, // Nuxt includes Vue
       metadata: {
         hasNuxtConfig: nuxtConfigFiles.some(file => context.configFiles.includes(file)),
         hasPagesDir: context.files.some(file => file.startsWith('pages/')),
@@ -97,57 +101,15 @@ export class NuxtDetection {
    * Detect Nuxt version
    */
   static async detectVersion(context: DetectionContext): Promise<string | undefined> {
-    // Try package.json first
-    if (context.packageJson?.dependencies?.['nuxt']) {
-      const version = context.packageJson.dependencies['nuxt'];
-      const match = version.match(/^[\^~]?(\d+)/);
-      return match ? match[1] : undefined;
-    }
+    const versionInfo = await VersionUtils.detectNpmVersionInfo('nuxt', context);
+    return versionInfo ? versionInfo.major.toString() : undefined;
+  }
 
-    if (context.packageJson?.devDependencies?.['nuxt']) {
-      const version = context.packageJson.devDependencies['nuxt'];
-      const match = version.match(/^[\^~]?(\d+)/);
-      return match ? match[1] : undefined;
-    }
-
-    // Check for legacy Nuxt 2 packages
-    if (context.packageJson?.dependencies?.['nuxt-edge'] ||
-        context.packageJson?.devDependencies?.['nuxt-edge']) {
-      return '2'; // Nuxt Edge was primarily Nuxt 2
-    }
-
-    // Try package-lock.json for more precise version
-    try {
-      const packageLockPath = path.join(context.projectRoot, 'package-lock.json');
-      if (await fs.pathExists(packageLockPath)) {
-        const packageLock = await fs.readJson(packageLockPath);
-        const nuxtPackage = packageLock.dependencies?.nuxt || packageLock.packages?.['node_modules/nuxt'];
-
-        if (nuxtPackage?.version) {
-          const match = nuxtPackage.version.match(/^v?(\d+)/);
-          return match ? match[1] : undefined;
-        }
-      }
-    } catch (error) {
-      // Ignore errors
-    }
-
-    // Try yarn.lock
-    try {
-      const yarnLockPath = path.join(context.projectRoot, 'yarn.lock');
-      if (await fs.pathExists(yarnLockPath)) {
-        const yarnLock = await fs.readFile(yarnLockPath, 'utf-8');
-        const nuxtMatch = yarnLock.match(/nuxt@[\^~]?(\d+\.\d+\.\d+)/);
-        if (nuxtMatch) {
-          const majorVersion = nuxtMatch[1].split('.')[0];
-          return majorVersion;
-        }
-      }
-    } catch (error) {
-      // Ignore errors
-    }
-
-    return undefined;
+  /**
+   * Get detailed version information
+   */
+  static async getVersionInfo(context: DetectionContext): Promise<NpmVersionInfo | null> {
+    return VersionUtils.detectNpmVersionInfo('nuxt', context);
   }
 
   /**

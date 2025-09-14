@@ -1,9 +1,0 @@
-{
-    "name": "test/laravel-app-84",
-    "type": "project",
-    "description": "Test Laravel application with PHP 8.4",
-    "require": {
-        "php": "^8.4.0",
-        "laravel/framework": "^12.0"
-    }
-}

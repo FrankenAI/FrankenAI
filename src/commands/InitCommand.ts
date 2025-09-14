@@ -153,8 +153,13 @@ Examples:
       return;
     }
 
-    // Step 4: Stack Detection  
+    // Step 4: Stack Detection
     const stack = await this.detectStack();
+
+    // Check for Laravel Boost and display warning
+    if (stack.frameworks && stack.frameworks.includes('laravel-boost')) {
+      this.displayBoostWarning();
+    }
 
     // Step 5: Template Selection (now automatic based on stack)
     await this.selectTemplates(stack, toolStatus, options);
@@ -202,27 +207,31 @@ Examples:
   }
 
   private async checkExistingSetup(options: InitOptions): Promise<boolean> {
-    const spinner = ora('🔍 Checking existing setup...').start();
-    
+    const spinner = this.logLevel >= LogLevel.QUIET ? ora('🔍 Checking existing setup...').start() : null;
+
     try {
       const claudeMdPath = path.join(process.cwd(), 'CLAUDE.md');
       const exists = await fs.pathExists(claudeMdPath);
-      
+
       if (!exists) {
-        spinner.stop();
+        spinner?.stop();
         return true; // No conflict, proceed
       }
 
       // Check if it has FrankenAI configuration
       const content = await fs.readFile(claudeMdPath, 'utf-8');
       const hasFrankenAI = content.includes('# FrankenAI Configuration');
-      
+
       // STOP spinner before any user interaction
-      spinner.stop();
-    
+      spinner?.stop();
+
       return await this.handleExistingFile(options, hasFrankenAI);
     } catch (error) {
-      spinner.fail('❌ Failed to check existing setup');
+      if (spinner) {
+        spinner.fail('❌ Failed to check existing setup');
+      } else {
+        this.logError(chalk.red('❌ Failed to check existing setup'));
+      }
       throw error;
     }
   }
@@ -262,7 +271,7 @@ Examples:
     if (!this.isInteractive) {
       this.logError(chalk.red('❌ CLAUDE.md exists and no --force or --yes provided'));
       this.logError(chalk.gray('   Use --force, --yes, or remove --no-interaction flag'));
-      throw new Error('Interactive input required but --no-interaction specified');
+      return false;
     }
 
     // Interactive prompts (spinner is already stopped)
@@ -414,7 +423,7 @@ Examples:
     this.log(LogLevel.NORMAL, chalk.green('   franken-ai init\n'));
   }
 
-  private async selectTemplates(stack: any, toolStatus: any, options: InitOptions): Promise<void> {
+  private async selectTemplates(_stack: any, _toolStatus: any, _options: InitOptions): Promise<void> {
     // This method is no longer needed with the new GuidelineManager
     // Guidelines are automatically selected based on the detected stack
     this.log(LogLevel.VERBOSE, chalk.gray('Guidelines will be automatically selected based on detected stack'));
@@ -455,7 +464,7 @@ Examples:
   }
 
 
-  private async generateWorkspace(stack: any, options: InitOptions, toolStatus: any, selectedTemplates: any) {
+  private async generateWorkspace(stack: any, _options: InitOptions, _toolStatus: any, _selectedTemplates: any) {
     this.log(LogLevel.NORMAL, chalk.blue('📝 Generating enhanced CLAUDE.md...'));
 
     try {
@@ -653,5 +662,18 @@ Examples:
       // Ignore errors
     }
     return undefined;
+  }
+
+  /**
+   * Display Laravel Boost priority warning
+   */
+  private displayBoostWarning(): void {
+    this.log(LogLevel.NORMAL, chalk.yellow.bold('⚠️  ATTENTION: Laravel Boost Detected'));
+    this.log(LogLevel.NORMAL, chalk.yellow('   Laravel Boost has been detected in this project. For optimization'));
+    this.log(LogLevel.NORMAL, chalk.yellow('   purposes, Laravel Boost will take precedence over individual Laravel'));
+    this.log(LogLevel.NORMAL, chalk.yellow('   tools to avoid conflicts and ensure methodology consistency.'));
+    this.log(LogLevel.NORMAL, chalk.yellow('   The following modules have been automatically excluded:'));
+    this.log(LogLevel.NORMAL, chalk.dim('   • Laravel, Tailwind, Livewire, Volt, Pennant, Folio, Pest, Pint, FluxUI'));
+    this.log(LogLevel.NORMAL, '');
   }
 }

@@ -14,12 +14,14 @@ export class VueModule implements FrameworkModule {
   readonly type = 'framework' as const;
   readonly priorityType = 'framework' as const;
 
+  private versionInfo: any; // Will store detailed version info
+
   getMetadata(): ModuleMetadata {
     return {
       name: 'vue',
       displayName: 'Vue.js',
       description: 'Vue.js framework module with detection and guidelines',
-      version: '1.0.0',
+      version: this.versionInfo?.installed || this.versionInfo?.raw || '1.0.0',
       author: 'FrankenAI',
       homepage: 'https://vuejs.org',
       keywords: ['javascript', 'typescript', 'framework', 'frontend', 'spa'],
@@ -28,7 +30,14 @@ export class VueModule implements FrameworkModule {
   }
 
   async detect(context: DetectionContext): Promise<DetectionResult> {
-    return VueDetection.detect(context);
+    const result = await VueDetection.detect(context);
+
+    // Store version info for later use
+    if (result.detected) {
+      this.versionInfo = await VueDetection.getVersionInfo(context);
+    }
+
+    return result;
   }
 
   async detectVersion(context: DetectionContext): Promise<string | undefined> {

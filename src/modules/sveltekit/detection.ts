@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import type { DetectionContext, DetectionResult } from '../../core/types/Module.js';
+import { VersionUtils, type NpmVersionInfo } from '../../core/utils/VersionUtils.js';
 
 /**
  * SvelteKit detection utilities
@@ -126,37 +127,15 @@ export class SvelteKitDetection {
    * Detect SvelteKit version
    */
   static async detectVersion(context: DetectionContext): Promise<string | undefined> {
-    // Try package.json first
-    if (context.packageJson?.dependencies?.['@sveltejs/kit']) {
-      const version = context.packageJson.dependencies['@sveltejs/kit'];
-      const match = version.match(/^[\^~]?(\d+)/);
-      return match ? match[1] : undefined;
-    }
+    const versionInfo = await VersionUtils.detectNpmVersionInfo('@sveltejs/kit', context);
+    return versionInfo ? versionInfo.major.toString() : undefined;
+  }
 
-    if (context.packageJson?.devDependencies?.['@sveltejs/kit']) {
-      const version = context.packageJson.devDependencies['@sveltejs/kit'];
-      const match = version.match(/^[\^~]?(\d+)/);
-      return match ? match[1] : undefined;
-    }
-
-    // Try package-lock.json for more precise version
-    try {
-      const packageLockPath = path.join(context.projectRoot, 'package-lock.json');
-      if (await fs.pathExists(packageLockPath)) {
-        const packageLock = await fs.readJson(packageLockPath);
-        const svelteKitPackage = packageLock.dependencies?.['@sveltejs/kit'] ||
-                                 packageLock.packages?.['node_modules/@sveltejs/kit'];
-
-        if (svelteKitPackage?.version) {
-          const match = svelteKitPackage.version.match(/^v?(\d+)/);
-          return match ? match[1] : undefined;
-        }
-      }
-    } catch (error) {
-      // Ignore errors
-    }
-
-    return undefined;
+  /**
+   * Get detailed version information
+   */
+  static async getVersionInfo(context: DetectionContext): Promise<NpmVersionInfo | null> {
+    return VersionUtils.detectNpmVersionInfo('@sveltejs/kit', context);
   }
 
   /**

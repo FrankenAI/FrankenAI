@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import type { DetectionContext, DetectionResult } from '../../core/types/Module.js';
+import { VersionUtils, type NpmVersionInfo } from '../../core/utils/VersionUtils.js';
 
 /**
  * Svelte detection utilities
@@ -84,36 +85,15 @@ export class SvelteDetection {
    * Detect Svelte version
    */
   static async detectVersion(context: DetectionContext): Promise<string | undefined> {
-    // Try package.json first
-    if (context.packageJson?.dependencies?.['svelte']) {
-      const version = context.packageJson.dependencies['svelte'];
-      const match = version.match(/^[\^~]?(\d+)/);
-      return match ? match[1] : undefined;
-    }
+    const versionInfo = await VersionUtils.detectNpmVersionInfo('svelte', context);
+    return versionInfo ? versionInfo.major.toString() : undefined;
+  }
 
-    if (context.packageJson?.devDependencies?.['svelte']) {
-      const version = context.packageJson.devDependencies['svelte'];
-      const match = version.match(/^[\^~]?(\d+)/);
-      return match ? match[1] : undefined;
-    }
-
-    // Try package-lock.json for more precise version
-    try {
-      const packageLockPath = path.join(context.projectRoot, 'package-lock.json');
-      if (await fs.pathExists(packageLockPath)) {
-        const packageLock = await fs.readJson(packageLockPath);
-        const sveltePackage = packageLock.dependencies?.svelte || packageLock.packages?.['node_modules/svelte'];
-
-        if (sveltePackage?.version) {
-          const match = sveltePackage.version.match(/^v?(\d+)/);
-          return match ? match[1] : undefined;
-        }
-      }
-    } catch (error) {
-      // Ignore errors
-    }
-
-    return undefined;
+  /**
+   * Get detailed version information
+   */
+  static async getVersionInfo(context: DetectionContext): Promise<NpmVersionInfo | null> {
+    return VersionUtils.detectNpmVersionInfo('svelte', context);
   }
 
   /**

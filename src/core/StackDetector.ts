@@ -41,13 +41,13 @@ export class StackDetector {
 
     // Run module-based detection
     const detectionResults = await this.moduleManager.detectStack(context);
-    const versions = await this.moduleManager.detectVersions(context, detectionResults);
+    await this.moduleManager.detectVersions(context, detectionResults);
 
     // Extract detected frameworks and languages
     const frameworks: string[] = [];
     const languages: string[] = [];
 
-    for (const [moduleId, result] of detectionResults) {
+    for (const [moduleId] of detectionResults) {
       const module = this.moduleManager.getModule(moduleId);
       if (module) {
         const displayName = module.getMetadata().displayName;

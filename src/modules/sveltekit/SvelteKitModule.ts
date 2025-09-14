@@ -14,12 +14,14 @@ export class SvelteKitModule implements FrameworkModule {
   readonly type = 'framework' as const;
   readonly priorityType = 'meta-framework' as const;
 
+  private versionInfo: any; // Will store detailed version info
+
   getMetadata(): ModuleMetadata {
     return {
       name: 'sveltekit',
       displayName: 'SvelteKit',
       description: 'SvelteKit full-stack framework module with detection and guidelines',
-      version: '1.0.0',
+      version: this.versionInfo?.installed || this.versionInfo?.raw || '1.0.0',
       author: 'FrankenAI',
       homepage: 'https://kit.svelte.dev',
       keywords: ['javascript', 'typescript', 'svelte', 'framework', 'fullstack', 'ssr'],
@@ -28,7 +30,14 @@ export class SvelteKitModule implements FrameworkModule {
   }
 
   async detect(context: DetectionContext): Promise<DetectionResult> {
-    return SvelteKitDetection.detect(context);
+    const result = await SvelteKitDetection.detect(context);
+
+    // Store version info for later use
+    if (result.detected) {
+      this.versionInfo = await SvelteKitDetection.getVersionInfo(context);
+    }
+
+    return result;
   }
 
   async detectVersion(context: DetectionContext): Promise<string | undefined> {

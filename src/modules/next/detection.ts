@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import type { DetectionContext, DetectionResult } from '../../core/types/Module.js';
+import { VersionUtils, type NpmVersionInfo } from '../../core/utils/VersionUtils.js';
 
 /**
  * Next.js detection utilities
@@ -77,10 +78,13 @@ export class NextDetection {
     // Ensure confidence doesn't exceed 1.0
     confidence = Math.min(confidence, 1.0);
 
+    const detected = confidence > 0.3;
+
     return {
-      detected: confidence > 0.3,
+      detected,
       confidence,
-      evidence,
+      evidence: detected ? [...evidence, 'Next.js includes React - excluding standalone React guidelines'] : evidence,
+      excludes: detected ? ['react'] : undefined, // Next.js includes React
       metadata: {
         hasNextConfig: nextConfigFiles.some(file => context.configFiles.includes(file)),
         hasPagesDir: context.files.some(file => file.startsWith('pages/')),
@@ -94,51 +98,15 @@ export class NextDetection {
    * Detect Next.js version
    */
   static async detectVersion(context: DetectionContext): Promise<string | undefined> {
-    // Try package.json first
-    if (context.packageJson?.dependencies?.['next']) {
-      const version = context.packageJson.dependencies['next'];
-      const match = version.match(/^[\^~]?(\d+)/);
-      return match ? match[1] : undefined;
-    }
+    const versionInfo = await VersionUtils.detectNpmVersionInfo('next', context);
+    return versionInfo ? versionInfo.major.toString() : undefined;
+  }
 
-    if (context.packageJson?.devDependencies?.['next']) {
-      const version = context.packageJson.devDependencies['next'];
-      const match = version.match(/^[\^~]?(\d+)/);
-      return match ? match[1] : undefined;
-    }
-
-    // Try package-lock.json for more precise version
-    try {
-      const packageLockPath = path.join(context.projectRoot, 'package-lock.json');
-      if (await fs.pathExists(packageLockPath)) {
-        const packageLock = await fs.readJson(packageLockPath);
-        const nextPackage = packageLock.dependencies?.next || packageLock.packages?.['node_modules/next'];
-
-        if (nextPackage?.version) {
-          const match = nextPackage.version.match(/^v?(\d+)/);
-          return match ? match[1] : undefined;
-        }
-      }
-    } catch (error) {
-      // Ignore errors
-    }
-
-    // Try yarn.lock
-    try {
-      const yarnLockPath = path.join(context.projectRoot, 'yarn.lock');
-      if (await fs.pathExists(yarnLockPath)) {
-        const yarnLock = await fs.readFile(yarnLockPath, 'utf-8');
-        const nextMatch = yarnLock.match(/next@[\^~]?(\d+\.\d+\.\d+)/);
-        if (nextMatch) {
-          const majorVersion = nextMatch[1].split('.')[0];
-          return majorVersion;
-        }
-      }
-    } catch (error) {
-      // Ignore errors
-    }
-
-    return undefined;
+  /**
+   * Get detailed version information
+   */
+  static async getVersionInfo(context: DetectionContext): Promise<NpmVersionInfo | null> {
+    return VersionUtils.detectNpmVersionInfo('next', context);
   }
 
   /**

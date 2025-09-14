@@ -13,7 +13,7 @@ export interface Guideline {
   id: string;
   path: string;
   content: string;
-  category: 'framework' | 'language' | 'feature';
+  category: 'framework' | 'language' | 'feature' | 'testing';
   priority: ModulePriorityType;
 }
 
@@ -68,41 +68,185 @@ export class GuidelineManager {
 
     const guidelines: Guideline[] = [];
     const modules = this.moduleManager.getModules();
+    const includedPriorityTypes = new Set<string>();
 
+    // First pass: collect included modules and their priority types
+    const includeModules: Array<{ module: any, version: string | undefined, detectionResult?: any }> = [];
 
     for (const module of modules) {
       // Check if this module matches the detected stack
-      const moduleMetadata = module.getMetadata();
       const shouldInclude = this.shouldIncludeModule(module, context);
 
-
       if (shouldInclude) {
+        // Track which priority types are included
+        const moduleInfo = module as any;
+        if (moduleInfo.priorityType) {
+          includedPriorityTypes.add(moduleInfo.priorityType);
+        }
+
         // Get version for this module
         const version = this.getModuleVersion(module, context);
 
-
-        // Get guideline paths from the module
-        let guidelinePaths: GuidelinePath[] = [];
-        if (module.type === 'framework') {
-          const frameworkModule = module as any;
-          guidelinePaths = await frameworkModule.getGuidelinePaths(version);
-        } else if (module.type === 'language') {
-          const languageModule = module as any;
-          guidelinePaths = await languageModule.getGuidelinePaths(version);
+        // Get detection result to access excludes
+        let detectionResult;
+        try {
+          if ('detect' in module && typeof module.detect === 'function') {
+            // Create a minimal detection context for getting excludes
+            const detectionContext = {
+              projectRoot: process.cwd(),
+              configFiles: context.stack.configFiles || [],
+              files: [],
+              packageJson: undefined, // Don't need package.json for excludes
+              composerJson: null
+            };
+            detectionResult = await module.detect(detectionContext);
+          }
+        } catch (error) {
+          // If detection fails, continue without excludes
         }
 
+        includeModules.push({ module, version, detectionResult });
+      }
+    }
 
-        // Load the actual guideline content
-        for (const guidelinePath of guidelinePaths) {
-          const guideline = await this.loadModuleGuideline(guidelinePath, module.id);
-          if (guideline) {
-            guidelines.push(guideline);
-          }
+    // Apply exclusion logic
+    const filteredModules = this.applyExclusions(includeModules);
+
+    // Second pass: Load common guidelines FIRST (only once per priority type)
+    await this.loadCommonGuidelines(guidelines, includedPriorityTypes);
+
+    // Third pass: Load specific module guidelines
+    for (const { module, version } of filteredModules) {
+      // Get guideline paths from the module
+      let guidelinePaths: GuidelinePath[] = [];
+      if (module.type === 'framework') {
+        const frameworkModule = module as any;
+        guidelinePaths = await frameworkModule.getGuidelinePaths(version);
+      } else if (module.type === 'language') {
+        const languageModule = module as any;
+        guidelinePaths = await languageModule.getGuidelinePaths(version);
+      } else if (module.type === 'library') {
+        const libraryModule = module as any;
+        guidelinePaths = await libraryModule.getGuidelinePaths(version);
+      }
+
+      // Load the actual guideline content
+      for (const guidelinePath of guidelinePaths) {
+        const guideline = await this.loadModuleGuideline(guidelinePath, module.id);
+        if (guideline) {
+          guidelines.push(guideline);
         }
       }
     }
 
     return this.sortGuidelines(guidelines);
+  }
+
+  /**
+   * Apply exclusions based on higher priority modules
+   */
+  private applyExclusions(
+    modules: Array<{ module: any, version: string | undefined, detectionResult?: any }>
+  ): Array<{ module: any, version: string | undefined }> {
+    const priorityOrder: Record<string, number> = {
+      'meta-framework': 6,
+      'framework': 5,
+      'css-framework': 4,
+      'laravel-tool': 3,
+      'specialized-lang': 2,
+      'base-lang': 1
+    };
+
+    // Sort modules by priority (higher first)
+    const sortedModules = [...modules].sort((a, b) => {
+      const priorityA = priorityOrder[a.module.priorityType] || 0;
+      const priorityB = priorityOrder[b.module.priorityType] || 0;
+      return priorityB - priorityA;
+    });
+
+    const excludedIds = new Set<string>();
+    const resultModules = [];
+
+    for (const moduleInfo of sortedModules) {
+      const { module, version, detectionResult } = moduleInfo;
+
+      // Skip if this module is excluded by a higher priority module
+      if (excludedIds.has(module.id)) {
+        console.log(`Module ${module.id} excluded by higher priority module`);
+        continue;
+      }
+
+      // Add this module to results
+      resultModules.push({ module, version });
+
+      // Add excludes from this module's detection result
+      if (detectionResult?.excludes) {
+        detectionResult.excludes.forEach((excludeId: string) => {
+          excludedIds.add(excludeId);
+          console.log(`Module ${module.id} excludes ${excludeId}`);
+        });
+      }
+    }
+
+    return resultModules;
+  }
+
+  /**
+   * Load common guidelines based on included priority types
+   * Common guidelines are loaded only once per priority type, even if multiple modules of that type exist
+   * They are loaded BEFORE specific module guidelines
+   */
+  private async loadCommonGuidelines(guidelines: Guideline[], includedPriorityTypes: Set<string>): Promise<void> {
+    const commonGuidelineMap: Record<string, { path: string; category: 'framework' | 'language' | 'feature' | 'testing' }> = {
+      'css-framework': {
+        path: 'css-frameworks/common.md',
+        category: 'framework'
+      }
+      // Add more common guidelines as needed:
+      // 'testing-framework': { path: 'testing-frameworks/common.md', category: 'framework' },
+      // 'laravel-tool': { path: 'laravel-tools/common.md', category: 'framework' }
+    };
+
+    for (const priorityType of includedPriorityTypes) {
+      const commonGuideline = commonGuidelineMap[priorityType];
+      if (commonGuideline) {
+        const existingId = `common-${priorityType}`;
+
+        // Common guidelines are loaded only once, even with multiple modules of the same type
+        const guidelinePath: GuidelinePath = {
+          path: commonGuideline.path,
+          priority: priorityType as any,
+          category: commonGuideline.category
+        };
+
+        const guideline = await this.loadCommonGuideline(guidelinePath, existingId);
+        if (guideline) {
+          guidelines.push(guideline);
+        }
+      }
+    }
+  }
+
+  /**
+   * Load a common guideline from the guidelines directory
+   */
+  private async loadCommonGuideline(guidelinePath: GuidelinePath, id: string): Promise<Guideline | null> {
+    try {
+      const fullPath = path.join(this.guidelinesPath, guidelinePath.path);
+      if (await fs.pathExists(fullPath)) {
+        const content = await fs.readFile(fullPath, 'utf-8');
+        return {
+          id,
+          path: guidelinePath.path,
+          content,
+          category: guidelinePath.category,
+          priority: guidelinePath.priority
+        };
+      }
+    } catch (error) {
+      console.warn(`Failed to load common guideline: ${guidelinePath.path}`, error);
+    }
+    return null;
   }
 
   /**
@@ -114,6 +258,11 @@ export class GuidelineManager {
 
     // Check frameworks
     if (module.type === 'framework') {
+      return context.stack.frameworks.includes(displayName);
+    }
+
+    // Check libraries (CSS frameworks, tools, etc.)
+    if (module.type === 'library') {
       return context.stack.frameworks.includes(displayName);
     }
 
@@ -199,8 +348,10 @@ export class GuidelineManager {
    */
   private sortGuidelines(guidelines: Guideline[]): Guideline[] {
     const priorityOrder: Record<ModulePriorityType, number> = {
-      'meta-framework': 4,
-      'framework': 3,
+      'meta-framework': 6,
+      'framework': 5,
+      'css-framework': 4,
+      'laravel-tool': 3,
       'specialized-lang': 2,
       'base-lang': 1
     };

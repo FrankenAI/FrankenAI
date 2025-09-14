@@ -14,12 +14,14 @@ export class ReactModule implements FrameworkModule {
   readonly type = 'framework' as const;
   readonly priorityType = 'framework' as const;
 
+  private versionInfo: any; // Will store detailed version info
+
   getMetadata(): ModuleMetadata {
     return {
       name: 'react',
       displayName: 'React',
       description: 'React framework module with detection and guidelines',
-      version: '1.0.0',
+      version: this.versionInfo?.installed || this.versionInfo?.raw || '1.0.0',
       author: 'FrankenAI',
       homepage: 'https://react.dev',
       keywords: ['javascript', 'typescript', 'framework', 'frontend', 'spa', 'jsx'],
@@ -28,7 +30,14 @@ export class ReactModule implements FrameworkModule {
   }
 
   async detect(context: DetectionContext): Promise<DetectionResult> {
-    return ReactDetection.detect(context);
+    const result = await ReactDetection.detect(context);
+
+    // Store version info for later use
+    if (result.detected) {
+      this.versionInfo = await ReactDetection.getVersionInfo(context);
+    }
+
+    return result;
   }
 
   async detectVersion(context: DetectionContext): Promise<string | undefined> {

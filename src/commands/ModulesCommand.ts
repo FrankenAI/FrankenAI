@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
+import Table from 'cli-table3';
 import { ModuleManager } from '../core/ModuleManager.js';
 import { ModuleRegistry } from '../core/ModuleRegistry.js';
 import type { ModuleMetadata, ModulePriorityType } from '../core/types/Module.js';
@@ -158,22 +159,22 @@ Output formats:
       if (options.disabled && registration.enabled) continue;
 
       let metadata: ModuleMetadata | undefined;
-      let moduleType: 'framework' | 'language' | undefined;
-      let priority: ModulePriorityType = 'low';
+      let moduleType: 'framework' | 'language' | 'library' | undefined;
+      let priority: ModulePriorityType = 'base-lang';
 
       // Try to get metadata from loaded module
       try {
         const module = this.moduleManager.getModule(registration.id);
         if (module) {
-          metadata = module.getMetadata();
+          metadata = await Promise.resolve(module.getMetadata());
           moduleType = module.type;
-          priority = module.priority;
+          priority = module.priorityType || 'base-lang';
         } else if (registration.enabled) {
           // Try to load the module to get metadata
-          const moduleInstance = registration.factory();
-          metadata = moduleInstance.getMetadata();
+          const moduleInstance = await Promise.resolve(registration.factory());
+          metadata = await Promise.resolve(moduleInstance.getMetadata());
           moduleType = moduleInstance.type;
-          priority = moduleInstance.priority;
+          priority = moduleInstance.priorityType || 'base-lang';
         }
       } catch (error) {
         // Module failed to load, create minimal info
@@ -219,19 +220,19 @@ Output formats:
    */
   private sortModules(modules: ModuleInfo[]): ModuleInfo[] {
     return modules.sort((a, b) => {
-      // 1. Sort by loading priority (high -> medium -> low)
-      const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
-      const aPriorityValue = priorityOrder[a.priority || 'low'];
-      const bPriorityValue = priorityOrder[b.priority || 'low'];
+      // 1. Sort by loading priority (meta-framework -> framework -> specialized-lang -> base-lang)
+      const priorityOrder = { 'meta-framework': 0, 'framework': 1, 'css-framework': 2, 'laravel-tool': 3, 'specialized-lang': 4, 'base-lang': 5 };
+      const aPriorityValue = priorityOrder[a.priority || 'base-lang'];
+      const bPriorityValue = priorityOrder[b.priority || 'base-lang'];
 
       if (aPriorityValue !== bPriorityValue) {
         return aPriorityValue - bPriorityValue;
       }
 
       // 2. Sort by type (frameworks before languages)
-      const typeOrder = { 'framework': 0, 'language': 1, 'unknown': 2 };
-      const aTypeValue = typeOrder[a.type as keyof typeof typeOrder] || 2;
-      const bTypeValue = typeOrder[b.type as keyof typeof typeOrder] || 2;
+      const typeOrder = { 'framework': 0, 'library': 1, 'language': 2, 'unknown': 3 };
+      const aTypeValue = typeOrder[a.type as keyof typeof typeOrder] || 3;
+      const bTypeValue = typeOrder[b.type as keyof typeof typeOrder] || 3;
 
       if (aTypeValue !== bTypeValue) {
         return aTypeValue - bTypeValue;
@@ -247,38 +248,47 @@ Output formats:
    */
   private async outputTable(modules: ModuleInfo[], options: ModulesCommandOptions): Promise<void> {
     console.log(chalk.bold('\nAvailable Modules'));
-    console.log();
 
     if (modules.length === 0) {
-      console.log('No modules available');
+      console.log('\nNo modules available');
       return;
     }
 
-    // Prepare table data
-    const tableData = modules.map(module => {
-      if (options.detailed) {
-        return {
-          'Name': module.metadata.displayName,
-          'Type': this.getTypeString(module.type),
-          'Status': module.enabled ? 'Enabled' : 'Disabled',
-          'Priority': (module.priority || 'low').charAt(0).toUpperCase() + (module.priority || 'low').slice(1),
-          'Version': module.metadata.version || 'unknown',
-          'Description': (module.metadata.description || '').length > 50
-            ? (module.metadata.description || '').substring(0, 47) + '...'
-            : (module.metadata.description || '')
-        };
-      } else {
-        return {
-          'Name': module.metadata.displayName,
-          'Type': this.getTypeString(module.type),
-          'Status': module.enabled ? 'Enabled' : 'Disabled',
-          'Version': module.metadata.version || 'unknown'
-        };
+    // Create table with clean styling
+    const table = new Table({
+      head: options.detailed
+        ? ['Name', 'Type', 'Status', 'Priority', 'Version', 'Description']
+        : ['Name', 'Type', 'Status', 'Version'],
+      style: {
+        head: ['cyan'],
+        border: ['grey']
       }
     });
 
-    // Use console.table for clean, consistent formatting
-    console.table(tableData);
+    // Add rows to table
+    modules.forEach(module => {
+      if (options.detailed) {
+        table.push([
+          module.metadata.displayName,
+          this.getTypeString(module.type),
+          module.enabled ? chalk.green('Enabled') : chalk.red('Disabled'),
+          this.formatPriority(module.priority || 'base-lang'),
+          module.metadata.version || 'unknown',
+          (module.metadata.description || '').length > 50
+            ? (module.metadata.description || '').substring(0, 47) + '...'
+            : (module.metadata.description || '')
+        ]);
+      } else {
+        table.push([
+          module.metadata.displayName,
+          this.getTypeString(module.type),
+          module.enabled ? chalk.green('Enabled') : chalk.red('Disabled'),
+          module.metadata.version || 'unknown'
+        ]);
+      }
+    });
+
+    console.log(table.toString());
 
     // Summary
     this.displaySummary(modules);
@@ -291,13 +301,13 @@ Output formats:
     const enabledCount = modules.filter(m => m.enabled).length;
     const frameworkCount = modules.filter(m => m.type === 'framework').length;
     const languageCount = modules.filter(m => m.type === 'language').length;
-    const highPriorityCount = modules.filter(m => (m.priority || 'low') === 'high').length;
+    const metaFrameworkCount = modules.filter(m => (m.priority || 'base-lang') === 'meta-framework').length;
 
     console.log(`\n${chalk.bold('Summary:')}`);
     console.log(`  ${chalk.green('●')} ${enabledCount}/${modules.length} modules enabled`);
     console.log(`  ${chalk.blue('●')} ${frameworkCount} frameworks, ${chalk.cyan(languageCount)} languages`);
-    if (highPriorityCount > 0) {
-      console.log(`  ${chalk.yellow('●')} ${highPriorityCount} high priority modules`);
+    if (metaFrameworkCount > 0) {
+      console.log(`  ${chalk.yellow('●')} ${metaFrameworkCount} meta-frameworks`);
     }
   }
 
@@ -329,9 +339,9 @@ Output formats:
 
     for (const [index, module] of modules.entries()) {
       const statusIcon = module.enabled ? chalk.green('●') : chalk.gray('○');
-      const priority = module.priority || 'low';
-      const priorityText = priority === 'high' ? chalk.yellow(' [HIGH]') :
-                          priority === 'medium' ? chalk.blue(' [MED]') : '';
+      const priority = module.priority || 'base-lang';
+      const priorityText = priority === 'meta-framework' ? chalk.yellow(' [META]') :
+                          priority === 'framework' ? chalk.blue(' [FW]') : '';
 
       console.log(`${statusIcon} ${chalk.bold(module.metadata.displayName)}${priorityText}`);
 
@@ -395,9 +405,10 @@ Output formats:
           unknown: modules.filter(m => m.type === 'unknown').length
         },
         byPriority: {
-          high: modules.filter(m => (m.priority || 'low') === 'high').length,
-          medium: modules.filter(m => (m.priority || 'low') === 'medium').length,
-          low: modules.filter(m => (m.priority || 'low') === 'low').length
+          'meta-framework': modules.filter(m => (m.priority || 'base-lang') === 'meta-framework').length,
+          'framework': modules.filter(m => (m.priority || 'base-lang') === 'framework').length,
+          'specialized-lang': modules.filter(m => (m.priority || 'base-lang') === 'specialized-lang').length,
+          'base-lang': modules.filter(m => (m.priority || 'base-lang') === 'base-lang').length
         }
       }
     };
@@ -425,12 +436,28 @@ Output formats:
   private formatStatus(enabled: boolean): string {
     return enabled ? chalk.green('Enabled') : chalk.red('Disabled');
   }
+
+  /**
+   * Format module priority for display
+   */
+  private formatPriority(priority: ModulePriorityType): string {
+    const priorityLabels: Record<ModulePriorityType, string> = {
+      'meta-framework': 'Meta-framework',
+      'framework': 'Framework',
+      'css-framework': 'CSS-framework',
+      'laravel-tool': 'Laravel-tool',
+      'specialized-lang': 'Specialized-lang',
+      'base-lang': 'Base-lang'
+    };
+
+    return priorityLabels[priority] || priority;
+  }
 }
 
 interface ModuleInfo {
   id: string;
   enabled: boolean;
-  type: 'framework' | 'language' | 'unknown';
+  type: 'framework' | 'language' | 'library' | 'unknown';
   priority?: ModulePriorityType;
   metadata: ModuleMetadata;
   config?: any;

@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import type { DetectionContext, DetectionResult } from '../../core/types/Module.js';
+import { VersionUtils, type NpmVersionInfo } from '../../core/utils/VersionUtils.js';
 
 /**
  * Vue.js detection utilities
@@ -97,36 +98,15 @@ export class VueDetection {
    * Detect Vue version
    */
   static async detectVersion(context: DetectionContext): Promise<string | undefined> {
-    // Try package.json first
-    if (context.packageJson?.dependencies?.['vue']) {
-      const version = context.packageJson.dependencies['vue'];
-      const match = version.match(/^[\^~]?(\d+)/);
-      return match ? match[1] : undefined;
-    }
+    const versionInfo = await VersionUtils.detectNpmVersionInfo('vue', context);
+    return versionInfo ? versionInfo.major.toString() : undefined;
+  }
 
-    if (context.packageJson?.devDependencies?.['vue']) {
-      const version = context.packageJson.devDependencies['vue'];
-      const match = version.match(/^[\^~]?(\d+)/);
-      return match ? match[1] : undefined;
-    }
-
-    // Try package-lock.json for more precise version
-    try {
-      const packageLockPath = path.join(context.projectRoot, 'package-lock.json');
-      if (await fs.pathExists(packageLockPath)) {
-        const packageLock = await fs.readJson(packageLockPath);
-        const vuePackage = packageLock.dependencies?.vue || packageLock.packages?.['node_modules/vue'];
-
-        if (vuePackage?.version) {
-          const match = vuePackage.version.match(/^v?(\d+)/);
-          return match ? match[1] : undefined;
-        }
-      }
-    } catch (error) {
-      // Ignore errors
-    }
-
-    return undefined;
+  /**
+   * Get detailed version information
+   */
+  static async getVersionInfo(context: DetectionContext): Promise<NpmVersionInfo | null> {
+    return VersionUtils.detectNpmVersionInfo('vue', context);
   }
 
   /**

@@ -1,0 +1,1 @@
+export { LaravelBoostModule } from './LaravelBoostModule.js';

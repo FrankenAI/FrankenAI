@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import type { DetectionContext, DetectionResult } from '../../core/types/Module.js';
+import { VersionUtils, type NpmVersionInfo } from '../../core/utils/VersionUtils.js';
 
 /**
  * TypeScript detection utilities
@@ -92,65 +93,15 @@ export class TypeScriptDetection {
    * Detect TypeScript version
    */
   static async detectVersion(context: DetectionContext): Promise<string | undefined> {
-    // Try package.json typescript dependency
-    if (context.packageJson?.dependencies?.['typescript']) {
-      const version = context.packageJson.dependencies['typescript'];
-      const match = version.match(/^[\^~]?(\d+\.\d+)/);
-      return match ? match[1] : undefined;
-    }
+    const versionInfo = await VersionUtils.detectNpmVersionInfo('typescript', context);
+    return versionInfo ? versionInfo.major.toString() : undefined;
+  }
 
-    if (context.packageJson?.devDependencies?.['typescript']) {
-      const version = context.packageJson.devDependencies['typescript'];
-      const match = version.match(/^[\^~]?(\d+\.\d+)/);
-      return match ? match[1] : undefined;
-    }
-
-    // Try tsconfig.json compilerOptions.target
-    try {
-      const tsconfigPath = path.join(context.projectRoot, 'tsconfig.json');
-      if (await fs.pathExists(tsconfigPath)) {
-        const tsconfig = await fs.readJson(tsconfigPath);
-        const target = tsconfig.compilerOptions?.target;
-        if (target) {
-          // Map target to approximate TS version
-          const targetMap: Record<string, string> = {
-            'ES5': '2.0',
-            'ES6': '2.0',
-            'ES2015': '2.0',
-            'ES2016': '2.1',
-            'ES2017': '2.3',
-            'ES2018': '2.9',
-            'ES2019': '3.2',
-            'ES2020': '3.8',
-            'ES2021': '4.2',
-            'ES2022': '4.7',
-            'ESNext': '5.0'
-          };
-          return targetMap[target] || '4.0';
-        }
-      }
-    } catch (error) {
-      // Ignore errors
-    }
-
-    // Try package-lock.json for precise version
-    try {
-      const packageLockPath = path.join(context.projectRoot, 'package-lock.json');
-      if (await fs.pathExists(packageLockPath)) {
-        const packageLock = await fs.readJson(packageLockPath);
-        const tsPackage = packageLock.dependencies?.typescript ||
-                         packageLock.packages?.['node_modules/typescript'];
-
-        if (tsPackage?.version) {
-          const match = tsPackage.version.match(/^v?(\d+\.\d+)/);
-          return match ? match[1] : undefined;
-        }
-      }
-    } catch (error) {
-      // Ignore errors
-    }
-
-    return undefined;
+  /**
+   * Get detailed version information
+   */
+  static async getVersionInfo(context: DetectionContext): Promise<NpmVersionInfo | null> {
+    return VersionUtils.detectNpmVersionInfo('typescript', context);
   }
 
   /**

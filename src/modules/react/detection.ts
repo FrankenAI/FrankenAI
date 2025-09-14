@@ -1,11 +1,93 @@
 import fs from 'fs-extra';
 import path from 'path';
+import semver from 'semver';
 import type { DetectionContext, DetectionResult } from '../../core/types/Module.js';
+
+/**
+ * Version information for React
+ */
+interface ReactVersionInfo {
+  raw: string;           // '^18.0.0'
+  major: number;         // 18
+  installed?: string;    // '18.2.0' (if found in package-lock.json/node_modules)
+  source: 'dependency' | 'installed' | 'both';
+}
 
 /**
  * React detection utilities
  */
 export class ReactDetection {
+  /**
+   * Get major version from semver string
+   */
+  private static getMajorVersion(versionSpec: string): number {
+    const cleaned = semver.clean(versionSpec) || semver.minVersion(versionSpec)?.version;
+    return semver.major(cleaned || '0.0.0');
+  }
+
+  /**
+   * Get installed React version from node_modules
+   */
+  private static async getInstalledVersion(projectRoot: string): Promise<string | null> {
+    try {
+      // Try node_modules/react/package.json first
+      const reactPkgPath = path.join(projectRoot, 'node_modules/react/package.json');
+      if (await fs.pathExists(reactPkgPath)) {
+        const reactPkg = await fs.readJson(reactPkgPath);
+        return reactPkg.version || null;
+      }
+
+      // Fallback to package-lock.json
+      const packageLockPath = path.join(projectRoot, 'package-lock.json');
+      if (await fs.pathExists(packageLockPath)) {
+        const packageLock = await fs.readJson(packageLockPath);
+
+        // Check both old and new package-lock formats
+        const reactDep = packageLock.dependencies?.react ||
+                        packageLock.packages?.['node_modules/react'];
+
+        return reactDep?.version || null;
+      }
+
+      // Try yarn.lock parsing (simplified)
+      const yarnLockPath = path.join(projectRoot, 'yarn.lock');
+      if (await fs.pathExists(yarnLockPath)) {
+        const yarnLock = await fs.readFile(yarnLockPath, 'utf-8');
+        const reactMatch = yarnLock.match(/react@.*:\s*version\s+"([^"]+)"/);
+        return reactMatch?.[1] || null;
+      }
+
+    } catch (error) {
+      // Ignore file read errors
+    }
+    return null;
+  }
+
+  /**
+   * Detect React version with hybrid approach
+   */
+  private static async detectVersionInfo(context: DetectionContext): Promise<ReactVersionInfo | null> {
+    const dependencySpec = context.packageJson?.dependencies?.react ||
+                          context.packageJson?.devDependencies?.react;
+    if (!dependencySpec) return null;
+
+    const specMajor = this.getMajorVersion(dependencySpec);
+    const installedVersion = await this.getInstalledVersion(context.projectRoot);
+    const installedMajor = installedVersion ? this.getMajorVersion(installedVersion) : null;
+
+    // Priorité à la version installée si elle existe
+    const effectiveMajor = installedMajor || specMajor;
+    const source = installedMajor && specMajor
+      ? 'both'
+      : installedMajor ? 'installed' : 'dependency';
+
+    return {
+      raw: dependencySpec,
+      major: effectiveMajor,
+      installed: installedVersion || undefined,
+      source
+    };
+  }
   /**
    * Detect React framework
    */
@@ -109,39 +191,18 @@ export class ReactDetection {
   }
 
   /**
-   * Detect React version
+   * Detect React version using semver-aware approach
    */
   static async detectVersion(context: DetectionContext): Promise<string | undefined> {
-    // Try package.json first
-    if (context.packageJson?.dependencies?.['react']) {
-      const version = context.packageJson.dependencies['react'];
-      const match = version.match(/^[\^~]?(\d+)/);
-      return match ? match[1] : undefined;
-    }
+    const versionInfo = await this.detectVersionInfo(context);
+    return versionInfo ? versionInfo.major.toString() : undefined;
+  }
 
-    if (context.packageJson?.devDependencies?.['react']) {
-      const version = context.packageJson.devDependencies['react'];
-      const match = version.match(/^[\^~]?(\d+)/);
-      return match ? match[1] : undefined;
-    }
-
-    // Try package-lock.json for more precise version
-    try {
-      const packageLockPath = path.join(context.projectRoot, 'package-lock.json');
-      if (await fs.pathExists(packageLockPath)) {
-        const packageLock = await fs.readJson(packageLockPath);
-        const reactPackage = packageLock.dependencies?.react || packageLock.packages?.['node_modules/react'];
-
-        if (reactPackage?.version) {
-          const match = reactPackage.version.match(/^v?(\d+)/);
-          return match ? match[1] : undefined;
-        }
-      }
-    } catch (error) {
-      // Ignore errors
-    }
-
-    return undefined;
+  /**
+   * Get detailed version information
+   */
+  static async getVersionInfo(context: DetectionContext): Promise<ReactVersionInfo | null> {
+    return this.detectVersionInfo(context);
   }
 
   /**

@@ -1,11 +1,87 @@
 import fs from 'fs-extra';
 import path from 'path';
+import semver from 'semver';
 import type { DetectionContext, DetectionResult } from '../../core/types/Module.js';
+
+/**
+ * Version information for Laravel
+ */
+interface LaravelVersionInfo {
+  raw: string;           // '^11.0.0'
+  major: number;         // 11
+  installed?: string;    // '11.2.3' (if found in composer.lock)
+  source: 'dependency' | 'installed' | 'both' | 'command';
+}
 
 /**
  * Laravel detection utilities
  */
 export class LaravelDetection {
+  /**
+   * Get major version from semver string
+   */
+  private static getMajorVersion(versionSpec: string): number {
+    const cleaned = semver.clean(versionSpec) || semver.minVersion(versionSpec)?.version;
+    return semver.major(cleaned || '0.0.0');
+  }
+
+  /**
+   * Get installed Laravel version from composer.lock
+   */
+  private static async getInstalledVersion(projectRoot: string): Promise<string | null> {
+    try {
+      const composerLockPath = path.join(projectRoot, 'vendor/composer/installed.json');
+
+      if (await fs.pathExists(composerLockPath)) {
+        const installed = await fs.readJson(composerLockPath);
+        const packages = installed.packages || installed; // Handle different formats
+
+        const laravelPackage = Array.isArray(packages)
+          ? packages.find((pkg: any) => pkg.name === 'laravel/framework')
+          : null;
+
+        return laravelPackage?.version || null;
+      }
+
+      // Fallback to composer.lock
+      const composerLockFallback = path.join(projectRoot, 'composer.lock');
+      if (await fs.pathExists(composerLockFallback)) {
+        const composerLock = await fs.readJson(composerLockFallback);
+        const laravelPackage = composerLock.packages?.find(
+          (pkg: any) => pkg.name === 'laravel/framework'
+        );
+        return laravelPackage?.version || null;
+      }
+    } catch (error) {
+      // Ignore file read errors
+    }
+    return null;
+  }
+
+  /**
+   * Detect Laravel version with hybrid approach
+   */
+  private static async detectVersionInfo(context: DetectionContext): Promise<LaravelVersionInfo | null> {
+    const dependencySpec = context.composerJson?.require?.['laravel/framework'];
+    if (!dependencySpec) return null;
+
+    const specMajor = this.getMajorVersion(dependencySpec);
+    const installedVersion = await this.getInstalledVersion(context.projectRoot);
+    const installedMajor = installedVersion ? this.getMajorVersion(installedVersion) : null;
+
+    // Priorité à la version installée si elle existe
+    const effectiveMajor = installedMajor || specMajor;
+    const source = installedMajor && specMajor
+      ? 'both'
+      : installedMajor ? 'installed' : 'dependency';
+
+    return {
+      raw: dependencySpec,
+      major: effectiveMajor,
+      installed: installedVersion || undefined,
+      source
+    };
+  }
   /**
    * Detect Laravel framework
    */
@@ -98,52 +174,18 @@ export class LaravelDetection {
   }
 
   /**
-   * Detect Laravel version
+   * Detect Laravel version using semver-aware approach
    */
   static async detectVersion(context: DetectionContext): Promise<string | undefined> {
-    // Try composer.json first
-    if (context.composerJson?.require?.['laravel/framework']) {
-      const version = context.composerJson.require['laravel/framework'];
-      const match = version.match(/^[\^~]?(\d+)/);
-      return match ? match[1] : undefined;
-    }
+    const versionInfo = await this.detectVersionInfo(context);
+    return versionInfo ? versionInfo.major.toString() : undefined;
+  }
 
-    // Try composer.lock for more precise version
-    try {
-      const composerLockPath = path.join(context.projectRoot, 'composer.lock');
-      if (await fs.pathExists(composerLockPath)) {
-        const composerLock = await fs.readJson(composerLockPath);
-        const laravelPackage = composerLock.packages?.find(
-          (pkg: any) => pkg.name === 'laravel/framework'
-        );
-
-        if (laravelPackage) {
-          const match = laravelPackage.version.match(/^v?(\d+)/);
-          return match ? match[1] : undefined;
-        }
-      }
-    } catch (error) {
-      // Ignore errors
-    }
-
-    // Try Laravel version command if artisan exists
-    if (context.configFiles.includes('artisan')) {
-      try {
-        const { execSync } = await import('child_process');
-        const output = execSync('php artisan --version', {
-          cwd: context.projectRoot,
-          encoding: 'utf-8',
-          timeout: 5000
-        });
-
-        const match = output.match(/Laravel Framework (\d+)/);
-        return match ? match[1] : undefined;
-      } catch (error) {
-        // Ignore command execution errors
-      }
-    }
-
-    return undefined;
+  /**
+   * Get detailed version information
+   */
+  static async getVersionInfo(context: DetectionContext): Promise<LaravelVersionInfo | null> {
+    return this.detectVersionInfo(context);
   }
 
 

@@ -12,7 +12,9 @@
       "WebSearch",
       "Bash(bun:*)",
       "Bash(grep:*)",
-      "Read(//Volumes/PROG/@playground/megazord/**)"
+      "Read(//Volumes/PROG/@playground/megazord/**)",
+      "Bash(../../../dist/cli.js modules:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

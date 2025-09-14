@@ -14,12 +14,14 @@ export class NuxtModule implements FrameworkModule {
   readonly type = 'framework' as const;
   readonly priorityType = 'meta-framework' as const;
 
+  private versionInfo: any; // Will store detailed version info
+
   getMetadata(): ModuleMetadata {
     return {
       name: 'nuxt',
       displayName: 'Nuxt.js',
       description: 'Nuxt.js Vue framework module with detection and guidelines',
-      version: '1.0.0',
+      version: this.versionInfo?.installed || this.versionInfo?.raw || '1.0.0',
       author: 'FrankenAI',
       homepage: 'https://nuxt.com',
       keywords: ['javascript', 'typescript', 'vue', 'framework', 'ssr', 'static-site'],
@@ -28,7 +30,14 @@ export class NuxtModule implements FrameworkModule {
   }
 
   async detect(context: DetectionContext): Promise<DetectionResult> {
-    return NuxtDetection.detect(context);
+    const result = await NuxtDetection.detect(context);
+
+    // Store version info for later use
+    if (result.detected) {
+      this.versionInfo = await NuxtDetection.getVersionInfo(context);
+    }
+
+    return result;
   }
 
   async detectVersion(context: DetectionContext): Promise<string | undefined> {
@@ -41,6 +50,14 @@ export class NuxtModule implements FrameworkModule {
     // Core Nuxt framework guidelines
     paths.push({
       path: 'nuxt/guidelines/framework.md',
+      priority: 'meta-framework',
+      category: 'framework',
+      version
+    });
+
+    // Gemini CLI analysis guidelines for Nuxt.js complexity
+    paths.push({
+      path: 'nuxt/guidelines/gemini-analysis.md',
       priority: 'meta-framework',
       category: 'framework',
       version

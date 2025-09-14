@@ -68,10 +68,27 @@ export class ModuleRegistry {
       const module = await import(indexFile);
 
       // Support both default export and named export
-      const moduleInstance = module.default || module[moduleName] || module;
+      let moduleInstance = module.default || module[moduleName] || module;
+
+      // Try to find a module class by common naming patterns
+      if (!moduleInstance || (typeof moduleInstance === 'object' && !moduleInstance.id)) {
+        const capitalizedName = moduleName.charAt(0).toUpperCase() + moduleName.slice(1);
+        const possibleNames = [
+          `${capitalizedName}Module`,
+          `${capitalizedName}`,
+          moduleName
+        ];
+
+        for (const name of possibleNames) {
+          if (module[name]) {
+            moduleInstance = module[name];
+            break;
+          }
+        }
+      }
 
       if (typeof moduleInstance === 'function') {
-        return moduleInstance();
+        return new moduleInstance();
       }
 
       return moduleInstance;

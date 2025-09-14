@@ -18,6 +18,7 @@ export interface DetectionResult {
   detected: boolean;
   confidence: number; // 0-1, higher means more confident
   evidence: string[]; // List of evidence found
+  excludes?: string[]; // Module IDs to exclude if this module is detected
   metadata?: Record<string, any>;
 }
 
@@ -27,7 +28,7 @@ export interface DetectionResult {
 export interface GuidelinePath {
   path: string;
   priority: ModulePriorityType;
-  category: 'framework' | 'language' | 'feature';
+  category: 'framework' | 'language' | 'feature' | 'testing';
   version?: string;
 }
 
@@ -62,6 +63,8 @@ export interface ModuleContext {
 export type ModulePriorityType =
   | 'meta-framework'    // Next.js, Nuxt, SvelteKit, Laravel
   | 'framework'         // React, Vue, Svelte
+  | 'css-framework'     // Tailwind CSS, Bootstrap, Bulma
+  | 'laravel-tool'      // Livewire, Inertia, Filament, etc.
   | 'specialized-lang'  // TypeScript, PHP
   | 'base-lang';        // JavaScript
 
@@ -77,7 +80,7 @@ export interface Module {
   /**
    * Module type
    */
-  readonly type: 'framework' | 'language';
+  readonly type: 'framework' | 'language' | 'library';
 
   /**
    * Module priority type for detection ordering
@@ -133,6 +136,43 @@ export interface FrameworkModule extends Module {
 
   /**
    * Get framework-specific configuration files
+   */
+  getConfigFiles?(): string[];
+}
+
+/**
+ * Library module interface (CSS frameworks, utility libraries)
+ */
+export interface LibraryModule extends Module {
+  readonly type: 'library';
+
+  /**
+   * Detect if this library is present in the project
+   */
+  detect(context: DetectionContext): Promise<DetectionResult>;
+
+  /**
+   * Detect the version of this library
+   */
+  detectVersion(context: DetectionContext): Promise<string | undefined>;
+
+  /**
+   * Get guideline paths for this library
+   */
+  getGuidelinePaths(version?: string): Promise<GuidelinePath[]>;
+
+  /**
+   * Generate library-specific commands
+   */
+  generateCommands(context: ModuleContext): Promise<Partial<StackCommands>>;
+
+  /**
+   * Get supported file extensions
+   */
+  getSupportedExtensions?(): string[];
+
+  /**
+   * Get library-specific configuration files
    */
   getConfigFiles?(): string[];
 }

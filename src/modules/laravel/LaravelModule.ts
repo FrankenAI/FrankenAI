@@ -14,12 +14,14 @@ export class LaravelModule implements FrameworkModule {
   readonly type = 'framework' as const;
   readonly priorityType = 'meta-framework' as const;
 
+  private versionInfo: any; // Will store detailed version info
+
   getMetadata(): ModuleMetadata {
     return {
       name: 'laravel',
       displayName: 'Laravel',
       description: 'Laravel PHP framework module with detection and guidelines',
-      version: '1.0.0',
+      version: this.versionInfo?.installed || this.versionInfo?.raw || '1.0.0',
       author: 'FrankenAI',
       homepage: 'https://laravel.com',
       keywords: ['php', 'framework', 'mvc', 'eloquent', 'artisan'],
@@ -28,7 +30,14 @@ export class LaravelModule implements FrameworkModule {
   }
 
   async detect(context: DetectionContext): Promise<DetectionResult> {
-    return LaravelDetection.detect(context);
+    const result = await LaravelDetection.detect(context);
+
+    // Store version info for later use
+    if (result.detected) {
+      this.versionInfo = await LaravelDetection.getVersionInfo(context);
+    }
+
+    return result;
   }
 
   async detectVersion(context: DetectionContext): Promise<string | undefined> {
@@ -41,6 +50,14 @@ export class LaravelModule implements FrameworkModule {
     // Core Laravel framework guidelines
     paths.push({
       path: 'laravel/guidelines/framework.md',
+      priority: 'meta-framework',
+      category: 'framework',
+      version
+    });
+
+    // Gemini CLI analysis guidelines for Laravel complexity
+    paths.push({
+      path: 'laravel/guidelines/gemini-analysis.md',
       priority: 'meta-framework',
       category: 'framework',
       version

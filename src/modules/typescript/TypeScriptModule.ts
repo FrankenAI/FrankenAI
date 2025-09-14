@@ -12,12 +12,14 @@ export class TypeScriptModule implements LanguageModule {
   readonly type = 'language' as const;
   readonly priorityType = 'specialized-lang' as const;
 
+  private versionInfo: any; // Will store detailed version info
+
   getMetadata(): ModuleMetadata {
     return {
       name: 'typescript',
       displayName: 'TypeScript',
       description: 'TypeScript language module with detection and guidelines',
-      version: '1.0.0',
+      version: this.versionInfo?.installed || this.versionInfo?.raw || '1.0.0',
       author: 'FrankenAI',
       homepage: 'https://www.typescriptlang.org',
       keywords: ['typescript', 'language', 'javascript', 'types', 'frontend', 'backend'],
@@ -26,7 +28,14 @@ export class TypeScriptModule implements LanguageModule {
   }
 
   async detect(context: DetectionContext): Promise<DetectionResult> {
-    return TypeScriptDetection.detect(context);
+    const result = await TypeScriptDetection.detect(context);
+
+    // Store version info for later use
+    if (result.detected) {
+      this.versionInfo = await TypeScriptDetection.getVersionInfo(context);
+    }
+
+    return result;
   }
 
   async detectVersion(context: DetectionContext): Promise<string | undefined> {

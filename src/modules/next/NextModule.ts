@@ -14,12 +14,14 @@ export class NextModule implements FrameworkModule {
   readonly type = 'framework' as const;
   readonly priorityType = 'meta-framework' as const;
 
+  private versionInfo: any; // Will store detailed version info
+
   getMetadata(): ModuleMetadata {
     return {
       name: 'next',
       displayName: 'Next.js',
       description: 'Next.js React framework module with detection and guidelines',
-      version: '1.0.0',
+      version: this.versionInfo?.installed || this.versionInfo?.raw || '1.0.0',
       author: 'FrankenAI',
       homepage: 'https://nextjs.org',
       keywords: ['javascript', 'typescript', 'react', 'framework', 'ssr', 'static-site'],
@@ -28,7 +30,14 @@ export class NextModule implements FrameworkModule {
   }
 
   async detect(context: DetectionContext): Promise<DetectionResult> {
-    return NextDetection.detect(context);
+    const result = await NextDetection.detect(context);
+
+    // Store version info for later use
+    if (result.detected) {
+      this.versionInfo = await NextDetection.getVersionInfo(context);
+    }
+
+    return result;
   }
 
   async detectVersion(context: DetectionContext): Promise<string | undefined> {
@@ -41,6 +50,14 @@ export class NextModule implements FrameworkModule {
     // Core Next.js framework guidelines
     paths.push({
       path: 'next/guidelines/framework.md',
+      priority: 'meta-framework',
+      category: 'framework',
+      version
+    });
+
+    // Gemini CLI analysis guidelines for Next.js complexity
+    paths.push({
+      path: 'next/guidelines/gemini-analysis.md',
       priority: 'meta-framework',
       category: 'framework',
       version
